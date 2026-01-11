@@ -7,7 +7,7 @@
 "use client";
 
 import { MoreVertical, Eye, Download, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/app/src/components/ui/button";
 
 // Mock data - would come from API/database in production
 const projects = [
@@ -118,7 +118,8 @@ export function ProjectList() {
           </thead>
           <tbody className="divide-y divide-primary/5">
             {projects.map((project) => {
-              const status = statusConfig[project.status as keyof typeof statusConfig];
+              const status =
+                statusConfig[project.status as keyof typeof statusConfig];
 
               return (
                 <tr
@@ -141,9 +142,7 @@ export function ProjectList() {
                         className={`w-2 h-2 rounded-full ${status.color} ${
                           project.status === "active" ? "animate-pulse" : ""
                         } ${
-                          project.status === "scanning"
-                            ? "animate-ping"
-                            : ""
+                          project.status === "scanning" ? "animate-ping" : ""
                         }`}
                       />
                       <span
@@ -205,8 +204,11 @@ export function ProjectList() {
       {/* Footer */}
       <div className="p-4 border-t border-primary/10 flex items-center justify-between">
         <div className="text-sm font-mono text-muted-foreground">
-          Showing <span className="text-primary font-semibold">{projects.length}</span> of{" "}
-          <span className="text-primary font-semibold">{projects.length}</span> projects
+          Showing{" "}
+          <span className="text-primary font-semibold">{projects.length}</span>{" "}
+          of{" "}
+          <span className="text-primary font-semibold">{projects.length}</span>{" "}
+          projects
         </div>
         <div className="flex gap-2">
           <Button

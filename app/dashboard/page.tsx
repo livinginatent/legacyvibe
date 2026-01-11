@@ -4,9 +4,9 @@
  * Built with glassmorphism and cyber-tech aesthetic.
  */
 
-import { DashboardSidebar } from "@/components/dashboard/sidebar";
-import { NewProjectCard } from "@/components/dashboard/new-project-card";
-import { ProjectList } from "@/components/dashboard/project-list";
+import { DashboardSidebar } from "@/app/src/components/dashboard/sidebar";
+import { NewProjectCard } from "@/app/src/components/dashboard/new-project-card";
+import { ProjectList } from "@/app/src/components/dashboard/project-list";
 
 export default function DashboardPage() {
   return (
