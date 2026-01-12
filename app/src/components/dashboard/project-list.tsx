@@ -5,8 +5,25 @@
  */
 
 import { getUserRepos, GitHubRepo } from "@/services/github";
-import { Github, AlertCircle, ExternalLink, Terminal } from "lucide-react";
+import {
+  Github,
+  AlertCircle,
+  MoreVertical,
+  Sparkles,
+  Link2,
+  Search,
+  ShieldCheck,
+  UserPlus,
+} from "lucide-react";
 import { Button } from "@/app/src/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { ConnectGitHubButton } from "./connect-github-button";
 
@@ -134,26 +151,60 @@ function RepoRow({ repo, index }: { repo: GitHubRepo; index: number }) {
 
       {/* Actions */}
       <td className="px-6 py-4">
-        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <Link href={`/dashboard/scan/${encodeURIComponent(repo.full_name)}`}>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 px-3 hover:bg-primary/10 hover:text-primary font-mono text-xs gap-2"
+        <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+              >
+                <MoreVertical className="w-4 h-4" />
+                <span className="sr-only">Open actions menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-56 glass-card border-primary/30"
             >
-              <Terminal className="w-3 h-3" />
-              SCAN
-            </Button>
-          </Link>
-          <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </Button>
-          </a>
+              <DropdownMenuLabel className="font-mono text-primary">
+                Repository Actions
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-primary/10" />
+
+              <DropdownMenuItem asChild>
+                <Link
+                  href={`/dashboard/knowledge-harvest/${encodeURIComponent(
+                    repo.full_name
+                  )}`}
+                  className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>The &quot;Knowledge Harvest&quot;</span>
+                </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary">
+                <Link2 className="w-4 h-4" />
+                <span>Vibe History Linking</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary">
+                <Search className="w-4 h-4" />
+                <span>The Plain English Search</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary">
+                <ShieldCheck className="w-4 h-4" />
+                <span>The &quot;Vibe Check&quot; Audit</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary">
+                <UserPlus className="w-4 h-4" />
+                <span>The &quot;Hire-a-Pro&quot; Handover</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </td>
     </tr>

@@ -1,13 +1,13 @@
 /**
- * Project Scan Page - Analyze repository with AI
- * Two-column layout displaying Feature Clusters and Tech Stack
+ * Knowledge Harvest Page - Deep repository analysis with AI
+ * Extracts detailed insights about features, architecture, and tech stack
  * Uses tech-vibe-ui aesthetic with glowing cards and terminal styling
  */
 
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/app/src/utils/supabase/server";
-import { ScanInterface } from "./scan-interface";
+import { HarvestInterface } from "./harvest-interface";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ interface PageProps {
   params: Promise<{ repo: string }>;
 }
 
-export default async function ScanPage({ params }: PageProps) {
+export default async function KnowledgeHarvestPage({ params }: PageProps) {
   const { repo } = await params;
   const decodedRepo = decodeURIComponent(repo);
 
@@ -33,7 +33,7 @@ export default async function ScanPage({ params }: PageProps) {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground font-mono tracking-wider">
-                [ PROJECT ANALYSIS ]
+                [ KNOWLEDGE HARVEST ]
               </h1>
               <p className="text-sm text-muted-foreground font-mono mt-1">
                 {decodedRepo}
@@ -50,12 +50,12 @@ export default async function ScanPage({ params }: PageProps) {
             <div className="flex items-center justify-center py-16">
               <div className="flex items-center gap-3 text-primary font-mono text-lg animate-pulse">
                 <span className="inline-block w-2 h-2 bg-primary rounded-full animate-ping" />
-                <span>[ INITIALIZING SCANNER... ]</span>
+                <span>[ INITIALIZING HARVEST SYSTEM... ]</span>
               </div>
             </div>
           }
         >
-          <ScanInterface repoFullName={decodedRepo} installationId={installationId} />
+          <HarvestInterface repoFullName={decodedRepo} installationId={installationId} />
         </Suspense>
       </div>
 
