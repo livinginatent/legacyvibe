@@ -201,10 +201,10 @@ export async function signInWithPassword(email: string, password: string) {
  * Initiate GitHub App Installation from Dashboard.
  * Redirects user to install the LegacyVibe GitHub App, allowing them to select repositories.
  * GitHub will redirect back to /dashboard with installation_id in the query parameters.
- * 
+ *
  * This uses the GitHub App flow instead of OAuth, providing more granular repository access.
  * Users can select specific repositories to grant LegacyVibe access to.
- * 
+ *
  * Note: This is used from the dashboard AFTER the user has logged in via email/password.
  */
 export async function connectGitHub() {
@@ -219,7 +219,10 @@ export async function connectGitHub() {
       throw error;
     }
 
-    console.error("GitHub App installation error:", "Unexpected error occurred");
+    console.error(
+      "GitHub App installation error:",
+      "Unexpected error occurred"
+    );
 
     return {
       success: false,
@@ -287,7 +290,9 @@ export async function forgotPassword(email: string) {
 export async function updatePassword(newPassword: string) {
   try {
     // Validate input with Zod
-    const validation = updatePasswordSchema.safeParse({ password: newPassword });
+    const validation = updatePasswordSchema.safeParse({
+      password: newPassword,
+    });
 
     if (!validation.success) {
       const errors = validation.error.issues;

@@ -184,9 +184,16 @@ function RepoRow({ repo, index }: { repo: GitHubRepo; index: number }) {
                 </Link>
               </DropdownMenuItem>
 
-              <DropdownMenuItem className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary">
-                <Link2 className="w-4 h-4" />
-                <span>Vibe History Linking</span>
+              <DropdownMenuItem asChild>
+                <Link
+                  href={`/dashboard/vibe-history/${encodeURIComponent(
+                    repo.full_name
+                  )}`}
+                  className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary"
+                >
+                  <Link2 className="w-4 h-4" />
+                  <span>Vibe History Linking</span>
+                </Link>
               </DropdownMenuItem>
 
               <DropdownMenuItem className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary">

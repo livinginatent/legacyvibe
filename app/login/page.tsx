@@ -22,11 +22,7 @@ import {
 import { Button } from "@/app/src/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  signInWithPassword,
-  signUp,
-  getCurrentUser,
-} from "@/app/auth/actions";
+import { signInWithPassword, signUp, getCurrentUser } from "@/app/auth/actions";
 
 function LoginPageContent() {
   const router = useRouter();

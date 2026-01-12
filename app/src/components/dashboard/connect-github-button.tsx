@@ -15,7 +15,9 @@ interface ConnectGitHubButtonProps {
   variant?: "primary" | "outline";
 }
 
-export function ConnectGitHubButton({ variant = "primary" }: ConnectGitHubButtonProps) {
+export function ConnectGitHubButton({
+  variant = "primary",
+}: ConnectGitHubButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleConnect = async () => {
@@ -31,9 +33,10 @@ export function ConnectGitHubButton({ variant = "primary" }: ConnectGitHubButton
     }
   };
 
-  const buttonClasses = variant === "outline" 
-    ? "border-primary/50 hover:bg-primary/10 hover:border-primary font-mono text-sm"
-    : "bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold font-mono";
+  const buttonClasses =
+    variant === "outline"
+      ? "border-primary/50 hover:bg-primary/10 hover:border-primary font-mono text-sm"
+      : "bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold font-mono";
 
   return (
     <form action={handleConnect}>
