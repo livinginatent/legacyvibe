@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, CheckCircle, AlertCircle } from "lucide-react";
+import { Lock, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/app/src/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -121,7 +121,8 @@ export default function UpdatePasswordPage() {
                     type="password"
                     placeholder="••••••••"
                     required
-                    className="pl-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm"
+                    disabled={isLoading}
+                    className="pl-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
                 <p className="text-xs font-mono text-muted-foreground">
@@ -146,7 +147,8 @@ export default function UpdatePasswordPage() {
                     type="password"
                     placeholder="••••••••"
                     required
-                    className="pl-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm"
+                    disabled={isLoading}
+                    className="pl-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -156,9 +158,16 @@ export default function UpdatePasswordPage() {
                 type="submit"
                 size="lg"
                 disabled={isLoading}
-                className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold"
+                className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? "Updating..." : "Update Password"}
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin text-black" />
+                    <span>Updating...</span>
+                  </div>
+                ) : (
+                  "Update Password"
+                )}
               </Button>
             </form>
           )}

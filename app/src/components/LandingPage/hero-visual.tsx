@@ -65,7 +65,7 @@ const HeroVisual = () => {
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
         >
-          {chaoticBlocks.map((block) => (
+          {isClient && chaoticBlocks.map((block) => (
             <g
               key={block.id}
               className="animate-float"

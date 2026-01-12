@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 /**
  * Forgot Password Page
  * Allows users to request a password reset email.
@@ -8,7 +9,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Mail, ArrowRight, CheckCircle } from "lucide-react";
+import { Mail, ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/app/src/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,7 +132,8 @@ export default function ForgotPasswordPage() {
                       type="email"
                       placeholder="you@example.com"
                       required
-                      className="pl-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm"
+                      disabled={isLoading}
+                      className="pl-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -141,12 +143,19 @@ export default function ForgotPasswordPage() {
                   type="submit"
                   size="lg"
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold group relative overflow-hidden"
+                  className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="relative z-10">
-                    {isLoading ? "Sending..." : "Send Reset Link"}
-                  </span>
-                  <ArrowRight className="w-4 h-4 ml-2 relative z-10 group-hover:translate-x-1 transition-transform" />
+                  {isLoading ? (
+                    <div className="flex items-center justify-center relative z-10">
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin text-black" />
+                      <span>Sending...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="relative z-10">Send Reset Link</span>
+                      <ArrowRight className="w-4 h-4 ml-2 relative z-10 group-hover:translate-x-1 transition-transform" />
+                    </>
+                  )}
                 </Button>
               </form>
             </>

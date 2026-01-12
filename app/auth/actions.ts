@@ -16,6 +16,8 @@ import { createClient } from "@/app/src/utils/supabase/server";
 
 // Base URL for redirects - configurable via environment variable
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+// Site URL specifically for OAuth callbacks
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 // ============================================================================
 // Zod Validation Schemas
@@ -196,50 +198,32 @@ export async function signInWithPassword(email: string, password: string) {
 }
 
 /**
- * Sign in with GitHub OAuth.
- * Requests repo and user read permissions.
- * Redirects to GitHub for authentication with callback to /auth/callback.
+ * Initiate GitHub App Installation from Dashboard.
+ * Redirects user to install the LegacyVibe GitHub App, allowing them to select repositories.
+ * GitHub will redirect back to /dashboard with installation_id in the query parameters.
+ * 
+ * This uses the GitHub App flow instead of OAuth, providing more granular repository access.
+ * Users can select specific repositories to grant LegacyVibe access to.
+ * 
+ * Note: This is used from the dashboard AFTER the user has logged in via email/password.
  */
-export async function signInWithGithub() {
+export async function connectGitHub() {
   try {
-    const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: {
-        redirectTo: `${BASE_URL}/auth/callback`,
-        scopes: "repo read:user",
-      },
-    });
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-
-    if (data.url) {
-      // Redirect to GitHub OAuth page
-      redirect(data.url);
-    }
-
-    return {
-      success: false,
-      error: "Failed to generate OAuth URL",
-    };
+    // Redirect to GitHub App installation page
+    // User will be prompted to install the app and select repositories
+    // GitHub will redirect back to the Setup URL (/dashboard) with installation_id
+    redirect("https://github.com/apps/legacyvibe/installations/new");
   } catch (error) {
     // Handle redirect errors (redirect throws an error in Next.js)
     if (error instanceof Error && error.message === "NEXT_REDIRECT") {
       throw error;
     }
 
-    console.error("GitHub OAuth error:", "Unexpected error occurred");
+    console.error("GitHub App installation error:", "Unexpected error occurred");
 
     return {
       success: false,
-      error: "An unexpected error occurred during GitHub sign in",
+      error: "An unexpected error occurred while connecting to GitHub",
     };
   }
 }

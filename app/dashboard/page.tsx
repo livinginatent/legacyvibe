@@ -2,13 +2,43 @@
  * Dashboard page - Main workspace for managing legacy code projects.
  * Provides overview of active projects, quick actions, and system status.
  * Built with glassmorphism and cyber-tech aesthetic.
+ *
+ * Handles GitHub App installation callback by capturing installation_id from URL.
  */
 
+import { Suspense } from "react";
 import { DashboardSidebar } from "@/app/src/components/dashboard/sidebar";
 import { NewProjectCard } from "@/app/src/components/dashboard/new-project-card";
 import { ProjectList } from "@/app/src/components/dashboard/project-list";
+import { saveInstallationId } from "@/services/github";
+import { redirect } from "next/navigation";
 
-export default function DashboardPage() {
+// Force this page to be dynamic (not statically generated)
+// This is required because we need access to authenticated user sessions
+export const dynamic = "force-dynamic";
+
+/**
+ * Dashboard Page Component
+ * Accepts installation_id from GitHub App installation flow via searchParams
+ */
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ installation_id?: string }>;
+}) {
+  // Await searchParams (required in Next.js 16+)
+  const params = await searchParams;
+
+  // Handle GitHub App installation callback
+  if (params.installation_id) {
+    const success = await saveInstallationId(params.installation_id);
+
+    if (success) {
+      // Redirect to clean URL after saving installation_id
+      redirect("/dashboard");
+    }
+  }
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
@@ -32,9 +62,23 @@ export default function DashboardPage() {
             <NewProjectCard />
           </div>
 
-          {/* Project List */}
+          {/* GitHub Repositories */}
           <div>
-            <ProjectList />
+            <Suspense
+              fallback={
+                <div className="glass-card border border-primary/20">
+                  <div className="flex items-center justify-center py-16 px-6">
+                    <div className="flex items-center gap-3 text-primary font-mono text-lg animate-pulse">
+                      <span className="inline-block w-2 h-2 bg-primary rounded-full animate-ping" />
+                      <span>[ LOADING REPOSITORIES... ]</span>
+                      <span className="inline-block w-2 h-2 bg-primary rounded-full animate-ping animation-delay-200" />
+                    </div>
+                  </div>
+                </div>
+              }
+            >
+              <ProjectList />
+            </Suspense>
           </div>
         </div>
       </main>

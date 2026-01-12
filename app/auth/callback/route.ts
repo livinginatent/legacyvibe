@@ -1,7 +1,7 @@
 /**
  * OAuth Callback Handler
  * Handles the redirect from OAuth providers (GitHub) after authentication.
- * Exchanges the code for a session and redirects to the dashboard.
+ * Exchanges the authorization code for a session and redirects to the dashboard.
  * Follows security best practices - no token logging.
  */
 
@@ -23,9 +23,9 @@ export async function GET(request: Request) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
 
       if (error) {
-        // Redirect to error page with safe error message
+        // OAuth failed - redirect to login with error parameter
         return NextResponse.redirect(
-          `${origin}/auth/error?message=Authentication failed`
+          `${origin}/login?error=oauth_failed`
         );
       }
 
@@ -35,12 +35,13 @@ export async function GET(request: Request) {
       // Log error internally (never log tokens)
       console.error("OAuth callback error:", "Authentication flow failed");
 
+      // Redirect to login on unexpected error
       return NextResponse.redirect(
-        `${origin}/auth/error?message=Unexpected error occurred`
+        `${origin}/login?error=oauth_failed`
       );
     }
   }
 
-  // No code provided - redirect to home
-  return NextResponse.redirect(`${origin}/`);
+  // No code provided - redirect to login
+  return NextResponse.redirect(`${origin}/login`);
 }

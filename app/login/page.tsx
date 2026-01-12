@@ -1,20 +1,20 @@
+/* eslint-disable react/no-unescaped-entities */
 /**
  * Login Page - Authentication interface for LegacyVibe.
- * Provides GitHub OAuth and email/password authentication.
+ * Provides email/password authentication.
  * Follows tech-vibe-ui aesthetic with glassmorphism and cyan accents.
  * Includes loading states and email verification notifications.
  */
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Github,
   Mail,
   Lock,
   ArrowRight,
-  Sparkles,
   Loader2,
   CheckCircle,
   AlertCircle,
@@ -23,18 +23,42 @@ import { Button } from "@/app/src/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  signInWithGithub,
   signInWithPassword,
   signUp,
+  getCurrentUser,
 } from "@/app/auth/actions";
 
-export default function LoginPage() {
+function LoginPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isGithubLoading, setIsGithubLoading] = useState(false);
   const [error, setError] = useState("");
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState("");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      const user = await getCurrentUser();
+      if (user) {
+        // User is already logged in, redirect to dashboard
+        router.push("/dashboard");
+      } else {
+        setIsCheckingAuth(false);
+      }
+    };
+    checkAuth();
+  }, [router]);
+
+  // Check for errors in URL
+  useEffect(() => {
+    const authError = searchParams.get("error");
+    if (authError) {
+      setError("Authentication failed. Please try again.");
+    }
+  }, [searchParams]);
 
   const handleEmailAuth = async (formData: FormData) => {
     setIsLoading(true);
@@ -57,7 +81,8 @@ export default function LoginPage() {
           setError(result.error || "Sign up failed");
           // Show field-specific errors if available
           if (result.fieldErrors) {
-            const fieldError = result.fieldErrors.email || result.fieldErrors.password;
+            const fieldError =
+              result.fieldErrors.email || result.fieldErrors.password;
             if (fieldError) setError(fieldError);
           }
         } else {
@@ -81,18 +106,19 @@ export default function LoginPage() {
     }
   };
 
-  const handleGithubAuth = async () => {
-    setIsGithubLoading(true);
-    setError("");
-    try {
-      await signInWithGithub();
-    } catch (err) {
-      if (err instanceof Error && err.message !== "NEXT_REDIRECT") {
-        setError("Failed to connect to GitHub");
-        setIsGithubLoading(false);
-      }
-    }
-  };
+  // Show loading state while checking auth
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          <p className="text-sm font-mono text-muted-foreground">
+            Checking authentication...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
@@ -114,7 +140,6 @@ export default function LoginPage() {
         <div className="relative glass-card p-8 border-2 border-primary/30 rounded-2xl backdrop-blur-xl">
           {/* Header */}
           <div className="text-center mb-8">
-           
             <h1 className="text-3xl font-bold text-foreground mb-2">
               {isSignUp ? "Create Account" : "Welcome Back"}
             </h1>
@@ -158,47 +183,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* GitHub OAuth */}
-          <form
-            action={handleGithubAuth}
-            className="mb-6"
-          >
-            <Button
-              type="submit"
-              variant="outline"
-              size="lg"
-              disabled={isGithubLoading || isLoading}
-              className="w-full border-primary/50 hover:bg-primary/10 hover:border-primary group relative overflow-hidden"
-            >
-              {/* Hover glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/10 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-
-              {isGithubLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 relative z-10 animate-spin" />
-                  <span className="relative z-10">Connecting to GitHub...</span>
-                </>
-              ) : (
-                <>
-                  <Github className="w-5 h-5 mr-2 relative z-10" />
-                  <span className="relative z-10">Continue with GitHub</span>
-                </>
-              )}
-            </Button>
-          </form>
-
-          {/* Divider */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-primary/20" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-4 text-muted-foreground font-mono">
-                Or {isSignUp ? "sign up" : "sign in"} with email
-              </span>
-            </div>
-          </div>
-
           {/* Email/Password Form */}
           <form action={handleEmailAuth} className="space-y-4">
             {/* Email Input */}
@@ -217,7 +201,7 @@ export default function LoginPage() {
                   type="email"
                   placeholder="you@example.com"
                   required
-                  disabled={isLoading || isGithubLoading}
+                  disabled={isLoading}
                   className="pl-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -249,7 +233,7 @@ export default function LoginPage() {
                   type="password"
                   placeholder="••••••••"
                   required
-                  disabled={isLoading || isGithubLoading}
+                  disabled={isLoading}
                   className="pl-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -264,19 +248,19 @@ export default function LoginPage() {
             <Button
               type="submit"
               size="lg"
-              disabled={isLoading || isGithubLoading}
+              disabled={isLoading}
               className="w-full bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {/* Animated background */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
 
               {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 relative z-10 animate-spin" />
-                  <span className="relative z-10">
+                <div className="flex items-center justify-center relative z-10">
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin text-black" />
+                  <span>
                     {isSignUp ? "Creating account..." : "Signing in..."}
                   </span>
-                </>
+                </div>
               ) : (
                 <>
                   <span className="relative z-10">
@@ -297,7 +281,7 @@ export default function LoginPage() {
                 setError("");
                 setVerificationSent(false);
               }}
-              disabled={isLoading || isGithubLoading}
+              disabled={isLoading}
               className="text-sm font-mono text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSignUp ? (
@@ -358,5 +342,22 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
+          <div className="relative z-10 flex flex-col items-center text-foreground">
+            <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
+            <p className="text-lg font-mono">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }
