@@ -1,13 +1,11 @@
 /**
- * Project Scan Page - Analyze repository with AI
- * Two-column layout displaying Feature Clusters and Tech Stack
- * Uses tech-vibe-ui aesthetic with glowing cards and terminal styling
+ * Repository Action Page - Single unified action for repository analysis
  */
 
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/app/src/utils/supabase/server";
-import { ScanInterface } from "./scan-interface";
+import { ActionInterface } from "./action-interface";
 
 export const dynamic = "force-dynamic";
 
@@ -15,14 +13,16 @@ interface PageProps {
   params: Promise<{ repo: string }>;
 }
 
-export default async function ScanPage({ params }: PageProps) {
+export default async function ActionPage({ params }: PageProps) {
   const { repo } = await params;
   const decodedRepo = decodeURIComponent(repo);
 
   // Get installation ID from user metadata
   const cookieStore = cookies();
   const supabase = createClient(cookieStore);
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const installationId = user?.user_metadata?.github_installation_id;
 
   return (
@@ -33,7 +33,7 @@ export default async function ScanPage({ params }: PageProps) {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground font-mono tracking-wider">
-                [ PROJECT ANALYSIS ]
+                [ REPOSITORY ANALYSIS ]
               </h1>
               <p className="text-sm text-muted-foreground font-mono mt-1">
                 {decodedRepo}
@@ -50,12 +50,15 @@ export default async function ScanPage({ params }: PageProps) {
             <div className="flex items-center justify-center py-16">
               <div className="flex items-center gap-3 text-primary font-mono text-lg animate-pulse">
                 <span className="inline-block w-2 h-2 bg-primary rounded-full animate-ping" />
-                <span>[ INITIALIZING SCANNER... ]</span>
+                <span>[ LOADING... ]</span>
               </div>
             </div>
           }
         >
-          <ScanInterface repoFullName={decodedRepo} installationId={installationId} />
+          <ActionInterface
+            repoFullName={decodedRepo}
+            installationId={installationId}
+          />
         </Suspense>
       </div>
 

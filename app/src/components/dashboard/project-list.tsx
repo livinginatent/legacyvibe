@@ -5,16 +5,7 @@
  */
 
 import { getUserRepos, GitHubRepo } from "@/services/github";
-import {
-  Github,
-  AlertCircle,
-  MoreVertical,
-  Sparkles,
-  Link2,
-  Search,
-  ShieldCheck,
-  UserPlus,
-} from "lucide-react";
+import { Github, AlertCircle, MoreVertical, Zap } from "lucide-react";
 import { Button } from "@/app/src/components/ui/button";
 import {
   DropdownMenu,
@@ -174,41 +165,14 @@ function RepoRow({ repo, index }: { repo: GitHubRepo; index: number }) {
 
               <DropdownMenuItem asChild>
                 <Link
-                  href={`/dashboard/knowledge-harvest/${encodeURIComponent(
+                  href={`/dashboard/action/${encodeURIComponent(
                     repo.full_name
                   )}`}
                   className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  <span>The &quot;Knowledge Harvest&quot;</span>
+                  <Zap className="w-4 h-4" />
+                  <span>Analyze Repository</span>
                 </Link>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem asChild>
-                <Link
-                  href={`/dashboard/vibe-history/${encodeURIComponent(
-                    repo.full_name
-                  )}`}
-                  className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Link2 className="w-4 h-4" />
-                  <span>Vibe History Linking</span>
-                </Link>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary">
-                <Search className="w-4 h-4" />
-                <span>The Plain English Search</span>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary">
-                <ShieldCheck className="w-4 h-4" />
-                <span>The &quot;Vibe Check&quot; Audit</span>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem className="cursor-pointer font-mono flex items-center gap-2 hover:bg-primary/10 hover:text-primary">
-                <UserPlus className="w-4 h-4" />
-                <span>The &quot;Hire-a-Pro&quot; Handover</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
