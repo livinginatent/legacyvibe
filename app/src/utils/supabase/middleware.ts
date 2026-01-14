@@ -29,12 +29,15 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // PROTECT ROUTES: If no user and trying to access anything except home/auth, redirect to home
+  // PROTECT ROUTES: If no user and trying to access anything except home/auth/api, redirect to home
   if (!user) {
     const path = request.nextUrl.pathname;
 
     const isPublicRoute =
-      path === "/" || path.startsWith("/auth") || path.startsWith("/login");
+      path === "/" || 
+      path.startsWith("/auth") || 
+      path.startsWith("/login") ||
+      path.startsWith("/api"); // API routes (including webhooks) don't require auth
 
     if (!isPublicRoute) {
       return NextResponse.redirect(new URL("/", request.url));
