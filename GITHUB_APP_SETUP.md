@@ -29,9 +29,9 @@ Under "Repository permissions":
 - **Redirect on update**: Check this box
 - **Setup URL**: `http://localhost:3000/dashboard`
 
-### 4. Subscribe to Events (Optional)
+### 4. Subscribe to Events
 
-You can skip this for now unless you want webhooks.
+You can skip this section.
 
 ### 5. Installation Options
 

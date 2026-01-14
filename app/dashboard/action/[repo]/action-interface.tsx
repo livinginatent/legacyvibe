@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Blueprint Orchestrator Interface - Visual Canvas with React Flow
  */
@@ -40,6 +41,8 @@ import {
   ChevronRight,
   Lightbulb,
   Flag,
+  FileDown,
+  Download,
 } from "lucide-react";
 import { Button } from "@/app/src/components/ui/button";
 import Link from "next/link";
@@ -54,6 +57,7 @@ import ReactFlow, {
   MarkerType,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import { exportOnboardingToPDF } from "./export-onboarding-pdf";
 
 interface FeatureNode {
   id: string;
@@ -146,6 +150,84 @@ interface ActionInterfaceProps {
   repoFullName: string;
   installationId?: string;
 }
+
+// Shared helpers for laying out nodes/edges so we don't repeat logic
+const layoutBlueprintNodes = (
+  blueprint: BlueprintGraph,
+  handleNodeClick: (node: FeatureNode) => void
+): Node[] => {
+  const nodeCount = blueprint.nodes.length;
+  const radius = Math.max(250, nodeCount * 40);
+  const centerX = 400;
+  const centerY = 300;
+
+  return blueprint.nodes.map((node, index) => {
+    const angle = (index / nodeCount) * 2 * Math.PI - Math.PI / 2;
+    const x = centerX + radius * Math.cos(angle);
+    const y = centerY + radius * Math.sin(angle);
+
+    return {
+      id: node.id,
+      type: "vibeCard",
+      position: { x, y },
+      data: {
+        ...node,
+        onClick: () => handleNodeClick(node),
+      },
+    };
+  });
+};
+
+const getEdgeColorForType = (edgeType?: string) => {
+  switch (edgeType) {
+    case "data":
+      return "#00d4ff"; // Cyan for data flow
+    case "control":
+      return "#f59e0b"; // Orange for control flow
+    case "config":
+      return "#a78bfa"; // Purple for config
+    default:
+      return "#00d4ff"; // Default cyan
+  }
+};
+
+const buildBlueprintEdges = (blueprint: BlueprintGraph): Edge[] => {
+  return blueprint.edges.map((edge, index) => {
+    const color = getEdgeColorForType(edge.type);
+
+    return {
+      id: `edge-${index}`,
+      source: edge.source,
+      target: edge.target,
+      label: edge.label,
+      type: ConnectionLineType.Bezier,
+      animated: edge.type === "data", // Only animate data flows
+      style: {
+        stroke: color,
+        strokeWidth: edge.type === "control" ? 3 : 2,
+        strokeDasharray: edge.type === "config" ? "5,5" : undefined,
+        filter: `drop-shadow(0 0 8px ${color}66)`,
+      },
+      labelStyle: {
+        fill: color,
+        fontSize: 10,
+        fontFamily: "JetBrains Mono, monospace",
+        fontWeight: 600,
+      },
+      labelBgStyle: {
+        fill: "#000",
+        fillOpacity: 0.9,
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: color,
+        width: 20,
+        height: 20,
+      },
+      data: { edgeType: edge.type },
+    };
+  });
+};
 
 // Custom Vibe Card Node Component
 function VibeCardNode({ data }: { data: any }) {
@@ -279,6 +361,8 @@ export function ActionInterface({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoadingCache, setIsLoadingCache] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [progressMessages, setProgressMessages] = useState<string[]>([]);
+  const [analysisStep, setAnalysisStep] = useState<string>("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [forceRescan, setForceRescan] = useState(false);
@@ -288,17 +372,36 @@ export function ActionInterface({
   // Impact Analysis state
   const [showImpactSearch, setShowImpactSearch] = useState(false);
   const [impactSearchQuery, setImpactSearchQuery] = useState("");
-  const [impactResult, setImpactResult] = useState<ImpactAnalysisResult | null>(null);
+  const [impactResult, setImpactResult] = useState<ImpactAnalysisResult | null>(
+    null
+  );
   const [isAnalyzingImpact, setIsAnalyzingImpact] = useState(false);
   const [impactError, setImpactError] = useState<string | null>(null);
 
   // Onboarding state
   const [onboardingMode, setOnboardingMode] = useState(false);
-  const [onboardingPath, setOnboardingPath] = useState<OnboardingPath | null>(null);
+  const [onboardingPath, setOnboardingPath] = useState<OnboardingPath | null>(
+    null
+  );
   const [isGeneratingOnboarding, setIsGeneratingOnboarding] = useState(false);
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
+
+  // Documentation state
+  const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
+  const [docsError, setDocsError] = useState<string | null>(null);
+
+  // Debt Heatmap state
+  const [showDebtHeatmap, setShowDebtHeatmap] = useState(false);
+  const [heatmapData, setHeatmapData] = useState<any>(null);
+  const [isLoadingHeatmap, setIsLoadingHeatmap] = useState(false);
+  const [heatmapError, setHeatmapError] = useState<string | null>(null);
+
+  // Usage tracking state
+  const [usageData, setUsageData] = useState<any>(null);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(true);
+  const [showUsageWarning, setShowUsageWarning] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -335,78 +438,8 @@ export function ActionInterface({
       return;
     }
 
-    // Create nodes in a circular layout
-    const nodeCount = result.blueprint.nodes.length;
-    const radius = Math.max(250, nodeCount * 40);
-    const centerX = 400;
-    const centerY = 300;
-
-    const flowNodes: Node[] = result.blueprint.nodes.map((node, index) => {
-      const angle = (index / nodeCount) * 2 * Math.PI - Math.PI / 2;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-
-      return {
-        id: node.id,
-        type: "vibeCard",
-        position: { x, y },
-        data: {
-          ...node,
-          onClick: () => handleNodeClick(node),
-        },
-      };
-    });
-
-    // Create edges with custom styling based on type
-    const flowEdges: Edge[] = result.blueprint.edges.map((edge, index) => {
-      // Color based on edge type
-      const getEdgeColor = (edgeType?: string) => {
-        switch (edgeType) {
-          case "data":
-            return "#00d4ff"; // Cyan for data flow
-          case "control":
-            return "#f59e0b"; // Orange for control flow
-          case "config":
-            return "#a78bfa"; // Purple for config
-          default:
-            return "#00d4ff"; // Default cyan
-        }
-      };
-
-      const color = getEdgeColor(edge.type);
-
-      return {
-        id: `edge-${index}`,
-        source: edge.source,
-        target: edge.target,
-        label: edge.label,
-        type: ConnectionLineType.Bezier,
-        animated: edge.type === "data", // Only animate data flows
-        style: {
-          stroke: color,
-          strokeWidth: edge.type === "control" ? 3 : 2,
-          strokeDasharray: edge.type === "config" ? "5,5" : undefined,
-          filter: `drop-shadow(0 0 8px ${color}66)`,
-        },
-        labelStyle: {
-          fill: color,
-          fontSize: 10,
-          fontFamily: "JetBrains Mono, monospace",
-          fontWeight: 600,
-        },
-        labelBgStyle: {
-          fill: "#000",
-          fillOpacity: 0.9,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: color,
-          width: 20,
-          height: 20,
-        },
-        data: { edgeType: edge.type },
-      };
-    });
+    const flowNodes = layoutBlueprintNodes(result.blueprint, handleNodeClick);
+    const flowEdges = buildBlueprintEdges(result.blueprint);
 
     setNodes(flowNodes);
     setEdges(flowEdges);
@@ -486,9 +519,15 @@ export function ActionInterface({
 
       setNodes((nds) =>
         nds.map((n) => {
-          const directNode = data.directlyAffectedNodes.find((an) => an.id === n.id);
-          const indirectNode = data.indirectlyAffectedNodes.find((an) => an.id === n.id);
-          const downstreamNode = data.downstreamNodes.find((an) => an.id === n.id);
+          const directNode = data.directlyAffectedNodes.find(
+            (an) => an.id === n.id
+          );
+          const indirectNode = data.indirectlyAffectedNodes.find(
+            (an) => an.id === n.id
+          );
+          const downstreamNode = data.downstreamNodes.find(
+            (an) => an.id === n.id
+          );
 
           if (directNode) {
             return {
@@ -539,7 +578,9 @@ export function ActionInterface({
         })
       );
     } catch (err) {
-      setImpactError(err instanceof Error ? err.message : "Impact analysis failed");
+      setImpactError(
+        err instanceof Error ? err.message : "Impact analysis failed"
+      );
     } finally {
       setIsAnalyzingImpact(false);
     }
@@ -562,16 +603,18 @@ export function ActionInterface({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate onboarding path");
+        throw new Error(
+          errorData.error || "Failed to generate onboarding path"
+        );
       }
 
       const data: OnboardingPath = await response.json();
-      
+
       // Validate response structure
       if (!data.learningPath || !Array.isArray(data.learningPath)) {
         throw new Error("Invalid onboarding path structure received from API");
       }
-      
+
       // Load progress from localStorage
       const savedProgress = localStorage.getItem(`onboarding-${repoFullName}`);
       if (savedProgress) {
@@ -590,14 +633,18 @@ export function ActionInterface({
       setOnboardingPath(data);
       setOnboardingMode(true);
       setCurrentStep(0);
-      
+
       // Highlight the learning path on canvas
       if (data.learningPath.length > 0) {
         highlightLearningPath(data.learningPath);
       }
     } catch (err) {
       console.error("Onboarding generation error:", err);
-      setOnboardingError(err instanceof Error ? err.message : "Failed to generate onboarding path");
+      setOnboardingError(
+        err instanceof Error
+          ? err.message
+          : "Failed to generate onboarding path"
+      );
     } finally {
       setIsGeneratingOnboarding(false);
     }
@@ -622,11 +669,17 @@ export function ActionInterface({
         progress[step.id] = true;
       }
     });
-    localStorage.setItem(`onboarding-${repoFullName}`, JSON.stringify(progress));
+    localStorage.setItem(
+      `onboarding-${repoFullName}`,
+      JSON.stringify(progress)
+    );
 
     // Move to next incomplete step
     const nextIncompleteIndex = updatedPath.learningPath.findIndex(
-      (s) => !s.completed && s.order > (onboardingPath.learningPath.find(s => s.id === stepId)?.order || 0)
+      (s) =>
+        !s.completed &&
+        s.order >
+          (onboardingPath.learningPath.find((s) => s.id === stepId)?.order || 0)
     );
     if (nextIncompleteIndex !== -1) {
       setCurrentStep(nextIncompleteIndex);
@@ -668,7 +721,7 @@ export function ActionInterface({
   const exitOnboardingMode = () => {
     setOnboardingMode(false);
     setExpandedStep(null);
-    
+
     // Reset canvas to normal view
     if (result) {
       const nodeCount = result.blueprint.nodes.length;
@@ -693,6 +746,80 @@ export function ActionInterface({
       });
 
       setNodes(flowNodes);
+    }
+  };
+
+  // Documentation functions
+  const exportDocumentation = async (
+    format: "markdown" | "mdx" = "markdown"
+  ) => {
+    setIsGeneratingDocs(true);
+    setDocsError(null);
+
+    try {
+      const response = await fetch("/api/documentation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repoFullName,
+          format,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate documentation");
+      }
+
+      const data = await response.json();
+
+      // Create download
+      const blob = new Blob([data.content], { type: "text/markdown" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${repo}-architecture.${format === "mdx" ? "mdx" : "md"}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      console.log("Documentation exported successfully");
+    } catch (err) {
+      console.error("Documentation export error:", err);
+      setDocsError(
+        err instanceof Error ? err.message : "Failed to export documentation"
+      );
+    } finally {
+      setIsGeneratingDocs(false);
+    }
+  };
+
+  // Debt Heatmap functions
+  const loadDebtHeatmap = async () => {
+    setIsLoadingHeatmap(true);
+    setHeatmapError(null);
+
+    try {
+      const response = await fetch(
+        `/api/debt-heatmap?repo=${encodeURIComponent(repoFullName)}&limit=10`
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to load heatmap");
+      }
+
+      const data = await response.json();
+      setHeatmapData(data);
+      setShowDebtHeatmap(true);
+    } catch (err) {
+      console.error("Heatmap error:", err);
+      setHeatmapError(
+        err instanceof Error ? err.message : "Failed to load heatmap"
+      );
+    } finally {
+      setIsLoadingHeatmap(false);
     }
   };
 
@@ -790,17 +917,11 @@ export function ActionInterface({
 
     setIsAnalyzing(true);
     setProgress(0);
+    setProgressMessages([]);
+    setAnalysisStep("");
     setError(null);
     setResult(null);
     clearImpactAnalysis();
-
-    // Simulate progress
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 90) return 90;
-        return prev + Math.random() * 10;
-      });
-    }, 800);
 
     try {
       const response = await fetch("/api/analyze", {
@@ -814,19 +935,92 @@ export function ActionInterface({
         }),
       });
 
-      clearInterval(progressInterval);
-      setProgress(100);
-
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Analysis failed");
+        // Handle non-streaming errors (like usage limit)
+        try {
+          const errorData = await response.json();
+          if (errorData.error === "USAGE_LIMIT_REACHED") {
+            setError(errorData.message);
+            if (errorData.usage) {
+              setUsageData(errorData.usage);
+            }
+            return;
+          }
+          throw new Error(errorData.error || "Analysis failed");
+        } catch (e) {
+          // If response isn't JSON, it might be streaming
+          if (!response.body) {
+            throw new Error("Analysis failed");
+          }
+        }
       }
 
-      const data = await response.json();
-      setResult(data);
-      setForceRescan(false);
+      // Handle streaming response
+      if (!response.body) {
+        throw new Error("No response body available");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response stream available");
+      }
+
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === "progress") {
+                setProgressMessages((prev) => [...prev, data.message]);
+                setAnalysisStep(data.step || "");
+
+                // Update progress based on step
+                if (data.step === "ingest") setProgress(10);
+                else if (data.step?.startsWith("chunk-")) {
+                  const chunkNum = parseInt(data.step.split("-")[1]);
+                  const totalChunks = data.message.match(/\d+\/(\d+)/)?.[1];
+                  if (totalChunks) {
+                    const baseProgress = 20;
+                    const chunkProgress =
+                      (chunkNum / parseInt(totalChunks)) * 50;
+                    setProgress(baseProgress + chunkProgress);
+                  }
+                } else if (data.step === "synthesize") setProgress(75);
+                else if (data.step === "validate") setProgress(85);
+                else if (data.step === "drift") setProgress(90);
+                else if (data.step === "cache") setProgress(95);
+                else if (data.step === "complete") setProgress(100);
+              } else if (data.type === "complete") {
+                setResult({
+                  blueprint: data.blueprint,
+                  analyzedAt: data.analyzedAt,
+                  cached: data.cached,
+                  drift: data.drift,
+                });
+                setProgress(100);
+                setForceRescan(false);
+              } else if (data.type === "error") {
+                throw new Error(data.error);
+              }
+            } catch (e) {
+              console.error("Failed to parse progress update:", e);
+            }
+          }
+        }
+      }
     } catch (err) {
-      clearInterval(progressInterval);
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
       setIsAnalyzing(false);
@@ -927,6 +1121,44 @@ export function ActionInterface({
               </Button>
 
               <Button
+                onClick={() => exportDocumentation("markdown")}
+                disabled={isGeneratingDocs}
+                variant="outline"
+                className="border-blue-500/50 hover:bg-blue-500/10 font-mono gap-2 text-blue-400"
+              >
+                {isGeneratingDocs ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Exporting...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-4 h-4" />
+                    <span>Export Docs</span>
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={loadDebtHeatmap}
+                disabled={isLoadingHeatmap}
+                variant="outline"
+                className="border-red-500/50 hover:bg-red-500/10 font-mono gap-2 text-red-400"
+              >
+                {isLoadingHeatmap ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-4 h-4" />
+                    <span>Debt Heatmap</span>
+                  </>
+                )}
+              </Button>
+
+              <Button
                 onClick={() => {
                   setForceRescan(true);
                   setTimeout(() => handleAnalyze(), 100);
@@ -955,7 +1187,8 @@ export function ActionInterface({
                   IMPACT ANALYSIS ENGINE
                 </h3>
                 <p className="text-sm text-gray-400 mb-4 font-mono">
-                  Enter a file path to see which features will be affected by changes
+                  Enter a file path to see which features will be affected by
+                  changes
                 </p>
 
                 <div className="flex gap-2">
@@ -1014,7 +1247,7 @@ export function ActionInterface({
         </div>
       )}
 
-      {/* Progress Bar */}
+      {/* Analysis Progress Display */}
       {isAnalyzing && (
         <div className="glass-card border border-primary/30 p-6 animate-fade-in-up">
           <div className="space-y-4">
@@ -1030,6 +1263,7 @@ export function ActionInterface({
               </span>
             </div>
 
+            {/* Animated Progress Bar */}
             <div className="relative h-2 bg-zinc-900 rounded-full overflow-hidden">
               <div
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-secondary transition-all duration-300 ease-out"
@@ -1039,22 +1273,32 @@ export function ActionInterface({
               </div>
             </div>
 
-            <div className="space-y-2 font-mono text-xs text-muted-foreground">
-              <p className={progress > 20 ? "text-primary" : ""}>
-                → Ingesting file tree and manifests...
+            {/* Comprehensive Mode Indicator */}
+            {analysisStep === "comprehensive" && (
+              <p className="text-cyan-400 text-xs font-mono mb-2">
+                🔍 COMPREHENSIVE MODE: Full-depth multi-pass analysis
               </p>
-              <p className={progress > 40 ? "text-primary" : ""}>
-                → Streaming analysis from Claude AI...
-              </p>
-              <p className={progress > 60 ? "text-primary" : ""}>
-                → Graphing business logic nodes...
-              </p>
-              <p className={progress > 80 ? "text-primary" : ""}>
-                → Caching blueprint...
-              </p>
-              <p className="text-cyan-500/70 mt-3 italic">
-                💡 Large repos may take a few minutes
-              </p>
+            )}
+
+            {/* Real-time Progress Messages - Thinking Style */}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {progressMessages.length > 0 ? (
+                progressMessages.map((message, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-2 text-sm font-mono text-gray-300 animate-fade-in"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <span className="text-primary mt-1">▸</span>
+                    <span className="flex-1">{message}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center gap-2 text-sm font-mono text-gray-400">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Initializing analysis...</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1084,7 +1328,349 @@ export function ActionInterface({
               <h3 className="font-mono font-semibold text-destructive mb-1">
                 ONBOARDING GENERATION FAILED
               </h3>
-              <p className="text-sm font-mono text-destructive/80">{onboardingError}</p>
+              <p className="text-sm font-mono text-destructive/80">
+                {onboardingError}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Documentation Error State */}
+      {docsError && (
+        <div className="glass-card border border-destructive/30 p-6 bg-destructive/5 animate-fade-in-up">
+          <div className="flex items-start gap-3">
+            <FileDown className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-mono font-semibold text-destructive mb-1">
+                DOCUMENTATION EXPORT FAILED
+              </h3>
+              <p className="text-sm font-mono text-destructive/80">
+                {docsError}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Technical Debt Heatmap */}
+      {showDebtHeatmap && heatmapData && (
+        <div className="space-y-4 animate-fade-in-up">
+          {/* Header */}
+          <div className="glass-card border border-red-500/50 bg-red-500/10 p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-2xl font-mono font-bold text-red-400 mb-2 flex items-center gap-2">
+                  <Activity className="w-7 h-7" />
+                  TECHNICAL DEBT HEATMAP
+                </h3>
+                <p className="text-sm font-mono text-gray-300">
+                  Time-series analysis of risk levels across{" "}
+                  {heatmapData.summary.totalScans} scans
+                </p>
+              </div>
+              <Button
+                onClick={() => setShowDebtHeatmap(false)}
+                variant="outline"
+                className="border-red-500/50 hover:bg-red-500/10 font-mono"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Overall Trend Summary */}
+            <div className="mt-4 grid grid-cols-4 gap-4">
+              <div className="glass-card border border-gray-700 p-4">
+                <p className="text-xs font-mono text-gray-400 mb-1">
+                  Overall Trend
+                </p>
+                <div className="flex items-center gap-2">
+                  {heatmapData.summary.overallTrend === "improving" ? (
+                    <TrendingDown className="w-5 h-5 text-green-400" />
+                  ) : heatmapData.summary.overallTrend === "degrading" ? (
+                    <TrendingUp className="w-5 h-5 text-red-400" />
+                  ) : (
+                    <Minus className="w-5 h-5 text-yellow-400" />
+                  )}
+                  <span
+                    className={`text-lg font-mono font-bold ${
+                      heatmapData.summary.overallTrend === "improving"
+                        ? "text-green-400"
+                        : heatmapData.summary.overallTrend === "degrading"
+                        ? "text-red-400"
+                        : "text-yellow-400"
+                    }`}
+                  >
+                    {heatmapData.summary.overallTrend.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="glass-card border border-gray-700 p-4">
+                <p className="text-xs font-mono text-gray-400 mb-1">
+                  Risk Score Delta
+                </p>
+                <div className="flex items-center gap-2">
+                  {heatmapData.summary.riskScoreDelta > 0 ? (
+                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5 text-green-400" />
+                  )}
+                  <span
+                    className={`text-lg font-mono font-bold ${
+                      heatmapData.summary.riskScoreDelta > 0
+                        ? "text-red-400"
+                        : "text-green-400"
+                    }`}
+                  >
+                    {heatmapData.summary.riskScoreDelta > 0 ? "+" : ""}
+                    {heatmapData.summary.riskScoreDelta}
+                  </span>
+                </div>
+              </div>
+
+              <div className="glass-card border border-gray-700 p-4">
+                <p className="text-xs font-mono text-gray-400 mb-1">
+                  High Risk Added
+                </p>
+                <div className="flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-red-400" />
+                  <span className="text-lg font-mono font-bold text-red-400">
+                    {heatmapData.summary.highRiskAdded}
+                  </span>
+                </div>
+              </div>
+
+              <div className="glass-card border border-gray-700 p-4">
+                <p className="text-xs font-mono text-gray-400 mb-1">
+                  High Risk Removed
+                </p>
+                <div className="flex items-center gap-2">
+                  <Minus className="w-5 h-5 text-green-400" />
+                  <span className="text-lg font-mono font-bold text-green-400">
+                    {heatmapData.summary.highRiskRemoved}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Risk Score Timeline */}
+          <div className="glass-card border border-red-500/30 p-6">
+            <h4 className="text-lg font-mono font-bold text-red-400 mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              RISK SCORE TIMELINE
+            </h4>
+
+            <div className="relative h-48 border border-gray-700 rounded bg-black/50 p-4">
+              {/* Timeline visualization */}
+              <div className="flex items-end justify-between h-full gap-2">
+                {heatmapData.snapshots
+                  .slice()
+                  .reverse()
+                  .map((snapshot: any, index: number) => {
+                    const height = `${snapshot.riskScore}%`;
+                    const date = new Date(
+                      snapshot.analyzedAt
+                    ).toLocaleDateString();
+                    const isLatest = index === heatmapData.snapshots.length - 1;
+
+                    return (
+                      <div
+                        key={index}
+                        className="flex-1 flex flex-col items-center gap-2"
+                      >
+                        <div
+                          className={`w-full rounded-t transition-all ${
+                            snapshot.riskScore > 70
+                              ? "bg-red-500"
+                              : snapshot.riskScore > 40
+                              ? "bg-yellow-500"
+                              : "bg-green-500"
+                          } ${isLatest ? "ring-2 ring-cyan-400" : ""}`}
+                          style={{ height }}
+                          title={`Risk Score: ${snapshot.riskScore}`}
+                        />
+                        <span className="text-[10px] font-mono text-gray-400 rotate-45 origin-top-left">
+                          {date}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Y-axis labels */}
+              <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-[10px] font-mono text-gray-500">
+                <span>100</span>
+                <span>75</span>
+                <span>50</span>
+                <span>25</span>
+                <span>0</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Risk Trends by Feature */}
+          <div className="glass-card border border-red-500/30 p-6">
+            <h4 className="text-lg font-mono font-bold text-red-400 mb-4 flex items-center gap-2">
+              <Flame className="w-5 h-5" />
+              FEATURE RISK TRENDS
+            </h4>
+
+            <div className="space-y-2">
+              {heatmapData.trends.slice(0, 10).map((trend: any) => {
+                const getTrendColor = () => {
+                  if (trend.trend === "increasing")
+                    return "text-red-400 bg-red-500/10 border-red-500/30";
+                  if (trend.trend === "decreasing")
+                    return "text-green-400 bg-green-500/10 border-green-500/30";
+                  if (trend.trend === "new")
+                    return "text-cyan-400 bg-cyan-500/10 border-cyan-500/30";
+                  return "text-gray-400 bg-gray-500/10 border-gray-500/30";
+                };
+
+                const getTrendIcon = () => {
+                  if (trend.trend === "increasing")
+                    return <TrendingUp className="w-4 h-4" />;
+                  if (trend.trend === "decreasing")
+                    return <TrendingDown className="w-4 h-4" />;
+                  if (trend.trend === "new")
+                    return <Plus className="w-4 h-4" />;
+                  return <Minus className="w-4 h-4" />;
+                };
+
+                return (
+                  <div
+                    key={trend.nodeId}
+                    className={`glass-card border p-4 hover:bg-opacity-20 transition-all ${getTrendColor()}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          {getTrendIcon()}
+                          <h5 className="font-mono font-bold">
+                            {trend.nodeLabel}
+                          </h5>
+                          <span className="text-xs font-mono px-2 py-0.5 rounded border">
+                            {trend.trend.toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-sm font-mono">
+                          {trend.previousRisk && (
+                            <>
+                              <span className="text-gray-400">
+                                Was:{" "}
+                                <span
+                                  className={getRiskColor(trend.previousRisk)}
+                                >
+                                  {trend.previousRisk}
+                                </span>
+                              </span>
+                              <ArrowRight className="w-4 h-4 text-gray-500" />
+                            </>
+                          )}
+                          <span className="text-gray-400">
+                            Now:{" "}
+                            <span className={getRiskColor(trend.currentRisk)}>
+                              {trend.currentRisk}
+                            </span>
+                          </span>
+                        </div>
+
+                        {/* Mini timeline */}
+                        <div className="mt-2 flex gap-1">
+                          {trend.snapshots
+                            .slice(0, 5)
+                            .reverse()
+                            .map((snap: any, i: number) => (
+                              <div
+                                key={i}
+                                className={`w-3 h-3 rounded-sm ${
+                                  snap.risk === "High"
+                                    ? "bg-red-500"
+                                    : snap.risk === "Med"
+                                    ? "bg-yellow-500"
+                                    : "bg-green-500"
+                                }`}
+                                title={`${snap.risk} - ${new Date(
+                                  snap.date
+                                ).toLocaleDateString()}`}
+                              />
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Most Improved / Most Degraded */}
+          {(heatmapData.summary.mostImprovedNodes.length > 0 ||
+            heatmapData.summary.mostDegradedNodes.length > 0) && (
+            <div className="grid grid-cols-2 gap-4">
+              {heatmapData.summary.mostImprovedNodes.length > 0 && (
+                <div className="glass-card border border-green-500/30 bg-green-500/5 p-6">
+                  <h4 className="text-lg font-mono font-bold text-green-400 mb-4 flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5" />
+                    MOST IMPROVED
+                  </h4>
+                  <ul className="space-y-2">
+                    {heatmapData.summary.mostImprovedNodes.map(
+                      (node: string, i: number) => (
+                        <li
+                          key={i}
+                          className="text-sm font-mono text-green-300 flex items-center gap-2"
+                        >
+                          <TrendingDown className="w-4 h-4 flex-shrink-0" />
+                          {node}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              {heatmapData.summary.mostDegradedNodes.length > 0 && (
+                <div className="glass-card border border-red-500/30 bg-red-500/5 p-6">
+                  <h4 className="text-lg font-mono font-bold text-red-400 mb-4 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5" />
+                    MOST DEGRADED
+                  </h4>
+                  <ul className="space-y-2">
+                    {heatmapData.summary.mostDegradedNodes.map(
+                      (node: string, i: number) => (
+                        <li
+                          key={i}
+                          className="text-sm font-mono text-red-300 flex items-center gap-2"
+                        >
+                          <TrendingUp className="w-4 h-4 flex-shrink-0" />
+                          {node}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Heatmap Error State */}
+      {heatmapError && (
+        <div className="glass-card border border-destructive/30 p-6 bg-destructive/5 animate-fade-in-up">
+          <div className="flex items-start gap-3">
+            <Activity className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-mono font-semibold text-destructive mb-1">
+                HEATMAP LOAD FAILED
+              </h3>
+              <p className="text-sm font-mono text-destructive/80">
+                {heatmapError}
+              </p>
             </div>
           </div>
         </div>
@@ -1225,16 +1811,7 @@ export function ActionInterface({
                 size={1}
                 style={{ opacity: 0.1 }}
               />
-              <Controls
-                className="bg-black border border-cyan-500/30 rounded-lg shadow-[0_0_20px_rgba(0,212,255,0.2)]"
-                style={{
-                  button: {
-                    backgroundColor: "#000",
-                    borderColor: "#00d4ff33",
-                    color: "#00d4ff",
-                  },
-                }}
-              />
+              <Controls className="bg-black border border-cyan-500/30 rounded-lg shadow-[0_0_20px_rgba(0,212,255,0.2)]" />
             </ReactFlow>
 
             {/* Instruction overlay */}
@@ -1245,7 +1822,7 @@ export function ActionInterface({
             </div>
 
             {/* Edge type legend */}
-            <div className="absolute bottom-4 left-4 bg-black/90 border border-cyan-500/30 rounded-lg px-4 py-3 backdrop-blur-sm">
+            <div className="absolute bottom-4 right-4 bg-black/90 border border-cyan-500/30 rounded-lg px-4 py-3 backdrop-blur-sm">
               <h4 className="text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-wider mb-2">
                 Connection Types
               </h4>
@@ -1298,7 +1875,11 @@ export function ActionInterface({
                     </h3>
                     <div className="flex items-center gap-4">
                       <div className="text-sm font-mono text-muted-foreground">
-                        Risk Score: <span className="text-2xl font-bold text-foreground">{impactResult.riskScore}</span>/100
+                        Risk Score:{" "}
+                        <span className="text-2xl font-bold text-foreground">
+                          {impactResult.riskScore}
+                        </span>
+                        /100
                       </div>
                       <div
                         className={`px-3 py-1 rounded-lg border text-sm font-mono font-bold ${
@@ -1324,12 +1905,16 @@ export function ActionInterface({
                   <div className="glass-card border border-red-500/30 bg-red-500/5 p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <AlertTriangle className="w-5 h-5 text-red-400" />
-                      <h4 className="font-mono font-bold text-red-400">DIRECT IMPACT</h4>
+                      <h4 className="font-mono font-bold text-red-400">
+                        DIRECT IMPACT
+                      </h4>
                     </div>
                     <p className="text-3xl font-mono font-bold text-foreground">
                       {impactResult.directlyAffectedNodes.length}
                     </p>
-                    <p className="text-xs font-mono text-gray-400">features contain this file</p>
+                    <p className="text-xs font-mono text-gray-400">
+                      features contain this file
+                    </p>
                   </div>
                 )}
 
@@ -1337,12 +1922,16 @@ export function ActionInterface({
                   <div className="glass-card border border-orange-500/30 bg-orange-500/5 p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <GitBranch className="w-5 h-5 text-orange-400" />
-                      <h4 className="font-mono font-bold text-orange-400">INDIRECT IMPACT</h4>
+                      <h4 className="font-mono font-bold text-orange-400">
+                        INDIRECT IMPACT
+                      </h4>
                     </div>
                     <p className="text-3xl font-mono font-bold text-foreground">
                       {impactResult.indirectlyAffectedNodes.length}
                     </p>
-                    <p className="text-xs font-mono text-gray-400">connected features</p>
+                    <p className="text-xs font-mono text-gray-400">
+                      connected features
+                    </p>
                   </div>
                 )}
 
@@ -1350,12 +1939,16 @@ export function ActionInterface({
                   <div className="glass-card border border-yellow-500/30 bg-yellow-500/5 p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <TrendingDown className="w-5 h-5 text-yellow-400" />
-                      <h4 className="font-mono font-bold text-yellow-400">DOWNSTREAM</h4>
+                      <h4 className="font-mono font-bold text-yellow-400">
+                        DOWNSTREAM
+                      </h4>
                     </div>
                     <p className="text-3xl font-mono font-bold text-foreground">
                       {impactResult.downstreamNodes.length}
                     </p>
-                    <p className="text-xs font-mono text-gray-400">downstream dependencies</p>
+                    <p className="text-xs font-mono text-gray-400">
+                      downstream dependencies
+                    </p>
                   </div>
                 )}
               </div>
@@ -1388,7 +1981,9 @@ export function ActionInterface({
                     key={node.id}
                     className="glass-card border border-red-500/30 p-4 hover:border-red-500/50 transition-colors cursor-pointer"
                     onClick={() => {
-                      const originalNode = result?.blueprint.nodes.find((n) => n.id === node.id);
+                      const originalNode = result?.blueprint.nodes.find(
+                        (n) => n.id === node.id
+                      );
                       if (originalNode) {
                         setSelectedNode(originalNode);
                         setSidePanelOpen(true);
@@ -1396,13 +1991,19 @@ export function ActionInterface({
                     }}
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <h5 className="font-mono font-semibold text-red-400">{node.label}</h5>
+                      <h5 className="font-mono font-semibold text-red-400">
+                        {node.label}
+                      </h5>
                       <span className="text-[10px] font-mono font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded border border-red-500/30">
                         DIRECT
                       </span>
                     </div>
-                    <p className="text-xs font-mono text-gray-400 mb-2">{node.reason}</p>
-                    <p className="text-xs text-gray-500 leading-relaxed">{node.description}</p>
+                    <p className="text-xs font-mono text-gray-400 mb-2">
+                      {node.reason}
+                    </p>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      {node.description}
+                    </p>
                   </div>
                 ))}
 
@@ -1411,7 +2012,9 @@ export function ActionInterface({
                     key={node.id}
                     className="glass-card border border-orange-500/30 p-4 hover:border-orange-500/50 transition-colors cursor-pointer"
                     onClick={() => {
-                      const originalNode = result?.blueprint.nodes.find((n) => n.id === node.id);
+                      const originalNode = result?.blueprint.nodes.find(
+                        (n) => n.id === node.id
+                      );
                       if (originalNode) {
                         setSelectedNode(originalNode);
                         setSidePanelOpen(true);
@@ -1419,13 +2022,19 @@ export function ActionInterface({
                     }}
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <h5 className="font-mono font-semibold text-orange-400">{node.label}</h5>
+                      <h5 className="font-mono font-semibold text-orange-400">
+                        {node.label}
+                      </h5>
                       <span className="text-[10px] font-mono font-bold text-orange-500 bg-orange-500/10 px-2 py-1 rounded border border-orange-500/30">
                         INDIRECT
                       </span>
                     </div>
-                    <p className="text-xs font-mono text-gray-400 mb-2">{node.reason}</p>
-                    <p className="text-xs text-gray-500 leading-relaxed">{node.description}</p>
+                    <p className="text-xs font-mono text-gray-400 mb-2">
+                      {node.reason}
+                    </p>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      {node.description}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -1447,13 +2056,27 @@ export function ActionInterface({
                       {onboardingPath.overview}
                     </p>
                   </div>
-                  <Button
-                    onClick={exitOnboardingMode}
-                    variant="outline"
-                    className="border-purple-500/50 hover:bg-purple-500/10 font-mono"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        if (onboardingPath) {
+                          exportOnboardingToPDF(repoFullName, onboardingPath);
+                        }
+                      }}
+                      variant="outline"
+                      className="border-purple-500/50 hover:bg-purple-500/10 font-mono gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Export PDF</span>
+                    </Button>
+                    <Button
+                      onClick={exitOnboardingMode}
+                      variant="outline"
+                      className="border-purple-500/50 hover:bg-purple-500/10 font-mono"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
@@ -1461,17 +2084,24 @@ export function ActionInterface({
                     <p className="text-3xl font-mono font-bold text-foreground">
                       {onboardingPath.totalSteps}
                     </p>
-                    <p className="text-xs font-mono text-gray-400">Total Steps</p>
+                    <p className="text-xs font-mono text-gray-400">
+                      Total Steps
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-3xl font-mono font-bold text-foreground">
-                      {Math.floor(onboardingPath.estimatedTotalTime / 60)}h {onboardingPath.estimatedTotalTime % 60}m
+                      {Math.floor(onboardingPath.estimatedTotalTime / 60)}h{" "}
+                      {onboardingPath.estimatedTotalTime % 60}m
                     </p>
-                    <p className="text-xs font-mono text-gray-400">Estimated Time</p>
+                    <p className="text-xs font-mono text-gray-400">
+                      Estimated Time
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-3xl font-mono font-bold text-purple-400">
-                      {onboardingPath.learningPath?.filter((s) => s.completed).length || 0}/{onboardingPath.totalSteps}
+                      {onboardingPath.learningPath?.filter((s) => s.completed)
+                        .length || 0}
+                      /{onboardingPath.totalSteps}
                     </p>
                     <p className="text-xs font-mono text-gray-400">Completed</p>
                   </div>
@@ -1548,7 +2178,9 @@ export function ActionInterface({
                       {/* Step Header */}
                       <div
                         className="flex items-start justify-between cursor-pointer"
-                        onClick={() => setExpandedStep(isExpanded ? null : step.id)}
+                        onClick={() =>
+                          setExpandedStep(isExpanded ? null : step.id)
+                        }
                       >
                         <div className="flex items-start gap-4 flex-1">
                           {/* Step Number */}
@@ -1561,14 +2193,24 @@ export function ActionInterface({
                                 : "border-gray-600 bg-gray-900 text-gray-500"
                             }`}
                           >
-                            {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : step.order}
+                            {isCompleted ? (
+                              <CheckCircle2 className="w-6 h-6" />
+                            ) : (
+                              step.order
+                            )}
                           </div>
 
                           {/* Step Info */}
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <h5 className="font-mono font-bold text-foreground">{step.title}</h5>
-                              <div className={`px-2 py-1 rounded border text-[10px] font-mono font-semibold flex items-center gap-1 ${getTypeColor(step.type)}`}>
+                              <h5 className="font-mono font-bold text-foreground">
+                                {step.title}
+                              </h5>
+                              <div
+                                className={`px-2 py-1 rounded border text-[10px] font-mono font-semibold flex items-center gap-1 ${getTypeColor(
+                                  step.type
+                                )}`}
+                              >
                                 {getTypeIcon(step.type)}
                                 {step.type.toUpperCase()}
                               </div>
@@ -1577,7 +2219,9 @@ export function ActionInterface({
                                 {step.estimatedTime}min
                               </div>
                             </div>
-                            <p className="text-sm text-gray-400">{step.description}</p>
+                            <p className="text-sm text-gray-400">
+                              {step.description}
+                            </p>
                             <p className="text-xs font-mono text-purple-400 mt-1">
                               Feature: {step.nodeName}
                             </p>
@@ -1624,7 +2268,9 @@ export function ActionInterface({
                                   key={i}
                                   className="text-sm font-mono text-gray-300 flex items-start gap-2"
                                 >
-                                  <span className="text-emerald-400 flex-shrink-0">→</span>
+                                  <span className="text-emerald-400 flex-shrink-0">
+                                    →
+                                  </span>
                                   <span>{obj}</span>
                                 </div>
                               ))}
@@ -1643,7 +2289,9 @@ export function ActionInterface({
                                   key={i}
                                   className="text-sm font-mono text-gray-300 flex items-start gap-2"
                                 >
-                                  <span className="text-yellow-400 flex-shrink-0">☐</span>
+                                  <span className="text-yellow-400 flex-shrink-0">
+                                    ☐
+                                  </span>
                                   <span>{checkpoint}</span>
                                 </div>
                               ))}
@@ -1784,54 +2432,56 @@ export function ActionInterface({
               </div>
 
               {/* Entry Points */}
-              {selectedNode.entryPoints && selectedNode.entryPoints.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
-                    <Play className="w-4 h-4" />
-                    Where to Start ({selectedNode.entryPoints.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedNode.entryPoints.map((entryPoint, i) => (
-                      <div
-                        key={i}
-                        className="bg-emerald-950/30 border border-emerald-500/20 rounded px-3 py-2 hover:border-emerald-500/40 transition-colors group"
-                      >
-                        <div className="flex items-start gap-2">
-                          <ArrowRight className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5 group-hover:translate-x-1 transition-transform" />
-                          <code className="text-sm font-mono text-emerald-300 break-all">
-                            {entryPoint}
-                          </code>
+              {selectedNode.entryPoints &&
+                selectedNode.entryPoints.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                      <Play className="w-4 h-4" />
+                      Where to Start ({selectedNode.entryPoints.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {selectedNode.entryPoints.map((entryPoint, i) => (
+                        <div
+                          key={i}
+                          className="bg-emerald-950/30 border border-emerald-500/20 rounded px-3 py-2 hover:border-emerald-500/40 transition-colors group"
+                        >
+                          <div className="flex items-start gap-2">
+                            <ArrowRight className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5 group-hover:translate-x-1 transition-transform" />
+                            <code className="text-sm font-mono text-emerald-300 break-all">
+                              {entryPoint}
+                            </code>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Conventions */}
-              {selectedNode.conventions && selectedNode.conventions.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-mono font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
-                    <BookOpen className="w-4 h-4" />
-                    Key Conventions ({selectedNode.conventions.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedNode.conventions.map((convention, i) => (
-                      <div
-                        key={i}
-                        className="bg-purple-950/30 border border-purple-500/20 rounded px-3 py-2 hover:border-purple-500/40 transition-colors"
-                      >
-                        <div className="flex items-start gap-2">
-                          <Shield className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
-                          <p className="text-sm font-mono text-purple-200 leading-relaxed">
-                            {convention}
-                          </p>
+              {selectedNode.conventions &&
+                selectedNode.conventions.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-mono font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
+                      <BookOpen className="w-4 h-4" />
+                      Key Conventions ({selectedNode.conventions.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {selectedNode.conventions.map((convention, i) => (
+                        <div
+                          key={i}
+                          className="bg-purple-950/30 border border-purple-500/20 rounded px-3 py-2 hover:border-purple-500/40 transition-colors"
+                        >
+                          <div className="flex items-start gap-2">
+                            <Shield className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                            <p className="text-sm font-mono text-purple-200 leading-relaxed">
+                              {convention}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Critical Files */}
               <div className="space-y-3">
@@ -1854,98 +2504,110 @@ export function ActionInterface({
               </div>
 
               {/* Connections */}
-              {result?.blueprint.edges.filter(
-                (e) =>
-                  e.source === selectedNode.id || e.target === selectedNode.id
-              ).length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-mono font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
-                    <GitBranch className="w-4 h-4" />
-                    Connections
-                  </h3>
-                  <div className="space-y-2">
-                    {result.blueprint.edges
-                      .filter(
-                        (e) =>
-                          e.source === selectedNode.id ||
-                          e.target === selectedNode.id
-                      )
-                      .map((edge, i) => {
-                        const connectedNode = result.blueprint.nodes.find(
-                          (n) =>
-                            n.id ===
-                            (edge.source === selectedNode.id
-                              ? edge.target
-                              : edge.source)
-                        );
-                        const isOutgoing = edge.source === selectedNode.id;
+              {selectedNode &&
+                result &&
+                result.blueprint.edges.filter(
+                  (e) =>
+                    e.source === selectedNode.id || e.target === selectedNode.id
+                ).length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-mono font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                      <GitBranch className="w-4 h-4" />
+                      Connections
+                    </h3>
+                    <div className="space-y-2">
+                      {result.blueprint.edges
+                        .filter(
+                          (e) =>
+                            selectedNode &&
+                            (e.source === selectedNode.id ||
+                              e.target === selectedNode.id)
+                        )
+                        .map((edge, i) => {
+                          const connectedNode = result.blueprint.nodes.find(
+                            (n) =>
+                              selectedNode &&
+                              n.id ===
+                                (edge.source === selectedNode.id
+                                  ? edge.target
+                                  : edge.source)
+                          );
+                          const isOutgoing = edge.source === selectedNode.id;
 
-                        const getEdgeTypeIcon = (edgeType?: string) => {
-                          switch (edgeType) {
-                            case "data":
-                              return <Database className="w-3 h-3 text-cyan-400" />;
-                            case "control":
-                              return <Settings className="w-3 h-3 text-orange-400" />;
-                            case "config":
-                              return <FileCode className="w-3 h-3 text-purple-400" />;
-                            default:
-                              return <GitBranch className="w-3 h-3 text-gray-400" />;
-                          }
-                        };
+                          const getEdgeTypeIcon = (edgeType?: string) => {
+                            switch (edgeType) {
+                              case "data":
+                                return (
+                                  <Database className="w-3 h-3 text-cyan-400" />
+                                );
+                              case "control":
+                                return (
+                                  <Settings className="w-3 h-3 text-orange-400" />
+                                );
+                              case "config":
+                                return (
+                                  <FileCode className="w-3 h-3 text-purple-400" />
+                                );
+                              default:
+                                return (
+                                  <GitBranch className="w-3 h-3 text-gray-400" />
+                                );
+                            }
+                          };
 
-                        const getEdgeTypeBorder = (edgeType?: string) => {
-                          switch (edgeType) {
-                            case "data":
-                              return "border-cyan-500/20 hover:border-cyan-500/40";
-                            case "control":
-                              return "border-orange-500/20 hover:border-orange-500/40";
-                            case "config":
-                              return "border-purple-500/20 hover:border-purple-500/40";
-                            default:
-                              return "border-cyan-500/10 hover:border-cyan-500/30";
-                          }
-                        };
+                          const getEdgeTypeBorder = (edgeType?: string) => {
+                            switch (edgeType) {
+                              case "data":
+                                return "border-cyan-500/20 hover:border-cyan-500/40";
+                              case "control":
+                                return "border-orange-500/20 hover:border-orange-500/40";
+                              case "config":
+                                return "border-purple-500/20 hover:border-purple-500/40";
+                              default:
+                                return "border-cyan-500/10 hover:border-cyan-500/30";
+                            }
+                          };
 
-                        return (
-                          <div
-                            key={i}
-                            className={`bg-zinc-900/50 border rounded p-3 transition-colors ${getEdgeTypeBorder(
-                              edge.type
-                            )}`}
-                          >
-                            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                              <span className="text-cyan-400 font-mono text-xs font-semibold">
-                                {isOutgoing ? "→ OUTGOING" : "← INCOMING"}
-                              </span>
-                              {edge.type && (
-                                <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/50 border border-current/20">
-                                  {getEdgeTypeIcon(edge.type)}
-                                  <span
-                                    className={`text-[10px] font-mono font-semibold uppercase ${
-                                      edge.type === "data"
-                                        ? "text-cyan-400"
-                                        : edge.type === "control"
-                                        ? "text-orange-400"
-                                        : "text-purple-400"
-                                    }`}
-                                  >
-                                    {edge.type}
-                                  </span>
-                                </div>
-                              )}
+                          return (
+                            <div
+                              key={i}
+                              className={`bg-zinc-900/50 border rounded p-3 transition-colors ${getEdgeTypeBorder(
+                                edge.type
+                              )}`}
+                            >
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <span className="text-cyan-400 font-mono text-xs font-semibold">
+                                  {isOutgoing ? "→ OUTGOING" : "← INCOMING"}
+                                </span>
+                                {edge.type && (
+                                  <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/50 border border-current/20">
+                                    {getEdgeTypeIcon(edge.type)}
+                                    <span
+                                      className={`text-[10px] font-mono font-semibold uppercase ${
+                                        edge.type === "data"
+                                          ? "text-cyan-400"
+                                          : edge.type === "control"
+                                          ? "text-orange-400"
+                                          : "text-purple-400"
+                                      }`}
+                                    >
+                                      {edge.type}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-sm font-mono text-gray-200 font-semibold mb-1">
+                                {connectedNode?.label}
+                              </div>
+                              <div className="text-xs font-mono text-gray-400 leading-relaxed">
+                                {edge.label}
+                              </div>
                             </div>
-                            <div className="text-sm font-mono text-gray-200 font-semibold mb-1">
-                              {connectedNode?.label}
-                            </div>
-                            <div className="text-xs font-mono text-gray-400 leading-relaxed">
-                              {edge.label}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Risk Analysis */}
               <div className="space-y-3">

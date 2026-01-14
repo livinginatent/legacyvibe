@@ -71,6 +71,15 @@ function EmptyState() {
  * Error state when repo fetch fails
  */
 function ErrorState({ error }: { error: string }) {
+  // Detect if the error is related to GitHub connection issues
+  const isNotConnected =
+    error.toLowerCase().includes("not connected") ||
+    error.toLowerCase().includes("installation") ||
+    error.toLowerCase().includes("github app") ||
+    error.toLowerCase().includes("reconnect") ||
+    error.toLowerCase().includes("401") ||
+    error.toLowerCase().includes("unauthorized");
+
   return (
     <div className="glass-card border border-destructive/20">
       <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
@@ -78,14 +87,37 @@ function ErrorState({ error }: { error: string }) {
           <AlertCircle className="w-8 h-8 text-destructive" />
         </div>
         <h3 className="text-lg font-mono font-semibold text-foreground mb-2">
-          Failed to load repositories
+          Failed to Load Repositories
         </h3>
-        <p className="text-sm text-muted-foreground font-mono max-w-md">
+        <p className="text-sm text-muted-foreground font-mono max-w-md mb-6">
           {error}
         </p>
-        <p className="text-xs text-muted-foreground font-mono mt-4">
-          Please try refreshing the page or reconnecting GitHub.
-        </p>
+
+        {isNotConnected && (
+          <div className="space-y-4">
+            <ConnectGitHubButton />
+            <p className="text-xs text-muted-foreground font-mono">
+              The GitHub App needs to be connected to access your repositories
+            </p>
+          </div>
+        )}
+
+        {!isNotConnected && (
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              <Button
+                onClick={() => window.location.reload()}
+                className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold font-mono"
+              >
+                Refresh Page
+              </Button>
+              <ConnectGitHubButton variant="outline" />
+            </div>
+            <p className="text-xs text-muted-foreground font-mono">
+              Try refreshing or reconnecting the GitHub App
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

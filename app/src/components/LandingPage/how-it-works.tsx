@@ -1,25 +1,26 @@
-import { Github, Brain, Search, ScrollText } from "lucide-react";
+import { Github, Brain, Search, ScrollText, Network } from "lucide-react";
 
 const steps = [
   {
-    icons: [Github, Brain],
-    title: "Sync Repo & Prompt History",
-    description: "We connect the 'vibe' (prompts) to the reality (code).",
-    label: "INGEST",
+    icons: [Github],
+    title: "Connect Your Repository",
+    description:
+      "Connect via GitHub App. We scan your entire codebase structure and files.",
+    label: "CONNECT",
   },
   {
-    icons: [Search],
-    title: "Contextual Analysis Engine",
+    icons: [Brain, Search],
+    title: "AI Deep Analysis",
     description:
-      "AI maps business logic, dependencies, and external API nervous systems.",
+      "Claude AI analyzes your codebase in chunks, extracts business logic, maps dependencies, and identifies features.",
     label: "ANALYZE",
   },
   {
-    icons: [ScrollText],
-    title: "Receive The Blueprint",
+    icons: [ScrollText, Network],
+    title: "Interactive Dashboard",
     description:
-      "A plain-english operating manual and interactive architecture map.",
-    label: "OUTPUT",
+      "Visual architecture graph, impact analysis, onboarding paths, documentation, and debt tracking—all in one place.",
+    label: "VISUALIZE",
   },
 ];
 
@@ -32,9 +33,11 @@ const HowItWorks = () => {
       <div className="container mx-auto px-6 relative z-10">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Decentralized{" "}
-            <span className="text-primary text-glow">Knowledge Harvest</span>
+            How It <span className="text-primary text-glow">Works</span>
           </h2>
+          <p className="font-mono text-muted-foreground mb-4">
+            Three simple steps to understand your codebase
+          </p>
           <div className="w-24 h-px bg-gradient-to-r from-transparent via-primary to-transparent mx-auto" />
         </div>
 

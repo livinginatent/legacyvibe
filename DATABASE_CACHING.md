@@ -343,7 +343,7 @@ ORDER BY generated_at DESC;
 ## Future Enhancements
 
 ### 1. **Automatic Cache Invalidation**
-- Monitor repository commits via GitHub webhooks
+- Monitor repository commits via periodic checks
 - Invalidate blueprint cache when significant changes detected
 - Send notification: "Your blueprint is outdated, rescan?"
 

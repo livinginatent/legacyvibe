@@ -10,24 +10,28 @@
 ## Environment Setup
 
 1. **Copy the environment template:**
+
    ```bash
    cp .env.example .env.local
    ```
 
 2. **Configure Supabase:**
+
    - Go to [Supabase Dashboard](https://supabase.com/dashboard)
    - Create a new project or select existing one
    - Go to Settings > API
-   - Copy the `URL` and `anon` key to your `.env.local`
+   - Copy the `URL` to `NEXT_PUBLIC_SUPABASE_URL` in `.env.local`
+   - Copy the `anon public` key to `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`
+   - Copy the `service_role` key to `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` (⚠️ Keep this secret!)
 
 3. **Configure GitHub App:**
+
    - Go to [GitHub Apps](https://github.com/settings/apps/new)
    - Create a new GitHub App with:
      - **Name**: LegacyVibe (or your preferred name)
      - **Homepage URL**: `http://localhost:3000`
      - **Callback URL**: `http://localhost:3000/auth/callback`
      - **Setup URL**: `http://localhost:3000/dashboard`
-     - **Webhook**: Leave unchecked for now
      - **Permissions**:
        - Repository > Contents: Read-only
        - Repository > Metadata: Read-only
@@ -45,11 +49,13 @@
 ## Installation
 
 1. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
 2. **Run the development server:**
+
    ```bash
    npm run dev
    ```
@@ -60,10 +66,12 @@
 ## Usage Flow
 
 1. **Register/Login:**
+
    - Use email and password to create an account
    - Verify your email via the link sent to your inbox
 
 2. **Connect GitHub:**
+
    - On the dashboard, click "Connect GitHub"
    - Select repositories you want to analyze
    - GitHub will redirect you back to the dashboard
@@ -76,14 +84,17 @@
 ## Troubleshooting
 
 ### "GitHub App not connected"
+
 - Make sure you've installed the GitHub App and selected at least one repository
 - Check that `GITHUB_APP_ID` and `GITHUB_PRIVATE_KEY` are correctly set
 
 ### "AI service not configured"
+
 - Verify `ANTHROPIC_API_KEY` is set in `.env.local`
 - Ensure your API key is valid and has credits
 
 ### "Failed to crawl repository"
+
 - Check that the repository is accessible
 - Verify the GitHub App has permissions to read repository contents
 - Try reinstalling the GitHub App with proper permissions

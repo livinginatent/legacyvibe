@@ -149,9 +149,26 @@ export async function getUserRepos(): Promise<GetReposResult> {
       language: repo.language,
     }));
   } catch (error) {
-    // Log error and return error object
+    // Check if the error is a 404 (installation not found / app uninstalled)
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
+    const isNotFound = 
+      errorMessage.includes("Not Found") || 
+      errorMessage.includes("404") ||
+      (error as any)?.status === 404;
+
+    if (isNotFound) {
+      console.log("GitHub App installation not found - clearing stored installation_id");
+      
+      // Clear the invalid installation_id from user metadata
+      await clearInstallationId();
+
+      return {
+        error: "GitHub App is not connected. Please connect the GitHub App to access your repositories.",
+      };
+    }
+
+    // Log other errors and return generic error message
     console.error("Failed to fetch user repos:", errorMessage);
     return {
       error: "Failed to fetch repositories. Please try reconnecting GitHub.",
@@ -190,6 +207,36 @@ export async function saveInstallationId(
       "Error saving installation_id:",
       "Failed to update user metadata"
     );
+    return false;
+  }
+}
+
+/**
+ * Clears the GitHub App installation_id from the user's metadata.
+ * Called when the GitHub App is uninstalled or the installation is invalid.
+ *
+ * @returns Success status
+ */
+export async function clearInstallationId(): Promise<boolean> {
+  try {
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
+
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        github_installation_id: null,
+      },
+    });
+
+    if (error) {
+      console.error("Failed to clear installation_id:", error.message);
+      return false;
+    }
+
+    console.log("Successfully cleared installation_id");
+    return true;
+  } catch (error) {
+    console.error("Error clearing installation_id:", error);
     return false;
   }
 }

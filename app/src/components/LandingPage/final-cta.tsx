@@ -16,16 +16,50 @@ const FinalCTA = () => {
 
       <div className="container mx-auto px-6 relative z-10 text-center">
         <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
-          Secure Your <span className="text-primary text-glow">AI Asset</span>{" "}
-          Today
+          Ready to Understand Your{" "}
+          <span className="text-primary text-glow">Codebase</span>?
         </h2>
 
-        <p className="font-mono text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
-          Stop hoping your codebase holds together. Start knowing exactly what's
-          under the hood.
+        <p className="font-mono text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
+          Get started with 5 comprehensive scans per month. Visualize architecture, 
+          track debt, analyze impact, and onboard developers.
         </p>
 
-        <Button variant="final-cta">Start Free Scan</Button>
+        {/* Pricing Card */}
+        <div className="glass-card p-8 max-w-md mx-auto mb-8 glow-border">
+          <div className="text-center mb-6">
+            <div className="text-5xl font-bold text-foreground mb-2">
+              <span className="text-primary">$14.99</span>
+            </div>
+            <div className="font-mono text-sm text-muted-foreground">
+              per month
+            </div>
+          </div>
+          
+          <div className="space-y-3 mb-6">
+            <div className="flex items-center justify-between font-mono text-sm">
+              <span className="text-muted-foreground">Repository Scans</span>
+              <span className="text-foreground font-semibold">5 per month</span>
+            </div>
+            <div className="flex items-center justify-between font-mono text-sm">
+              <span className="text-muted-foreground">Smart Reanalyze</span>
+              <span className="text-emerald-400">Unlimited (FREE)</span>
+            </div>
+            <div className="flex items-center justify-between font-mono text-sm">
+              <span className="text-muted-foreground">All Features</span>
+              <span className="text-foreground font-semibold">Included</span>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-border">
+            <Button variant="final-cta" className="w-full">
+              Start Free Trial
+            </Button>
+            <p className="font-mono text-xs text-muted-foreground mt-4">
+              No credit card required • Cancel anytime
+            </p>
+          </div>
+        </div>
       </div>
     </section>
   );

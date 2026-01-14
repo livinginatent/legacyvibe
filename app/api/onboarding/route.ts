@@ -14,6 +14,7 @@ interface OnboardingRequest {
   repoFullName: string;
   userLevel?: "beginner" | "intermediate" | "advanced";
   focusArea?: string;
+  forceRegenerate?: boolean;
 }
 
 interface LearningStep {
@@ -62,7 +63,12 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: OnboardingRequest = await request.json();
-    const { repoFullName, userLevel = "intermediate", focusArea, forceRegenerate } = body;
+    const {
+      repoFullName,
+      userLevel = "intermediate",
+      focusArea,
+      forceRegenerate,
+    } = body;
 
     if (!repoFullName) {
       return NextResponse.json(
@@ -133,26 +139,28 @@ export async function POST(request: NextRequest) {
 
     // Cache the result
     const now = new Date().toISOString();
-    const { error: cacheError } = await supabase.from("onboarding_paths").upsert(
-      {
-        user_id: user.id,
-        repo_full_name: repoFullName,
-        owner,
-        repo,
-        user_level: userLevel,
-        focus_area: focusArea || null,
-        learning_path: onboardingPath.learningPath,
-        total_steps: onboardingPath.totalSteps,
-        estimated_total_time: onboardingPath.estimatedTotalTime,
-        overview: onboardingPath.overview,
-        key_takeaways: onboardingPath.keyTakeaways,
-        generated_at: now,
-        updated_at: now,
-      },
-      {
-        onConflict: "user_id,repo_full_name,user_level",
-      }
-    );
+    const { error: cacheError } = await supabase
+      .from("onboarding_paths")
+      .upsert(
+        {
+          user_id: user.id,
+          repo_full_name: repoFullName,
+          owner,
+          repo,
+          user_level: userLevel,
+          focus_area: focusArea || null,
+          learning_path: onboardingPath.learningPath,
+          total_steps: onboardingPath.totalSteps,
+          estimated_total_time: onboardingPath.estimatedTotalTime,
+          overview: onboardingPath.overview,
+          key_takeaways: onboardingPath.keyTakeaways,
+          generated_at: now,
+          updated_at: now,
+        },
+        {
+          onConflict: "user_id,repo_full_name,user_level",
+        }
+      );
 
     if (cacheError) {
       console.error("Failed to cache onboarding path:", cacheError);
@@ -207,9 +215,21 @@ STEP TYPES:
 - "test": Run tests or verify behavior
 
 DIFFICULTY PROGRESSION:
-- ${userLevel === "beginner" ? "Start with foundational concepts, explain basics, more reading steps" : ""}
-- ${userLevel === "intermediate" ? "Balanced mix of reading and hands-on, assume programming knowledge" : ""}
-- ${userLevel === "advanced" ? "Focus on architecture patterns, integration, advanced concepts" : ""}
+- ${
+    userLevel === "beginner"
+      ? "Start with foundational concepts, explain basics, more reading steps"
+      : ""
+  }
+- ${
+    userLevel === "intermediate"
+      ? "Balanced mix of reading and hands-on, assume programming knowledge"
+      : ""
+  }
+- ${
+    userLevel === "advanced"
+      ? "Focus on architecture patterns, integration, advanced concepts"
+      : ""
+  }
 
 LEARNING PATH STRUCTURE:
 Step 1-2: "Welcome Tour" - Low-risk, stable features to build confidence
@@ -240,7 +260,11 @@ CRITICAL RULES:
 4. Total time should be 3-6 hours (180-360 minutes)
 5. Include at least one "modify" step where they make a change
 6. Make it encouraging and confidence-building
-7. ${focusArea ? `Focus the learning path on: ${focusArea}` : "Cover the most important features"}
+7. ${
+    focusArea
+      ? `Focus the learning path on: ${focusArea}`
+      : "Cover the most important features"
+  }
 8. MUST include top-level fields: overview (string), keyTakeaways (array), learningPath (array), estimatedTotalTime (number)
 
 EXACT JSON STRUCTURE TO RETURN:
@@ -281,7 +305,7 @@ ${JSON.stringify(blueprint, null, 2)}
 Generate a personalized learning path that will help a new developer understand this codebase and make their first contribution confidently.`;
 
   const stream = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-5-20250929",
     max_tokens: 8192,
     system: systemPrompt,
     messages: [
@@ -307,7 +331,7 @@ Generate a personalized learning path that will help a new developer understand 
   // Parse the JSON response
   console.log("Claude response length:", fullText.length);
   console.log("First 500 chars:", fullText.substring(0, 500));
-  
+
   const jsonMatch = fullText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     console.error("No JSON found in response:", fullText);
@@ -320,12 +344,19 @@ Generate a personalized learning path that will help a new developer understand 
   } catch (parseError) {
     console.error("JSON parse error:", parseError);
     console.error("JSON string:", jsonMatch[0].substring(0, 1000));
-    throw new Error(`Failed to parse Claude's response: ${parseError instanceof Error ? parseError.message : "Unknown error"}`);
+    throw new Error(
+      `Failed to parse Claude's response: ${
+        parseError instanceof Error ? parseError.message : "Unknown error"
+      }`
+    );
   }
 
   // Validate the structure
   if (!learningPath.learningPath || !Array.isArray(learningPath.learningPath)) {
-    console.error("Invalid structure - missing learningPath array:", learningPath);
+    console.error(
+      "Invalid structure - missing learningPath array:",
+      learningPath
+    );
     throw new Error("Claude's response is missing the learningPath array");
   }
 
@@ -336,26 +367,36 @@ Generate a personalized learning path that will help a new developer understand 
 
   // Get all valid node IDs from blueprint
   const validNodeIds = new Set(blueprint.nodes.map((n: any) => n.id));
-  
+
   // Validate each step has required fields and references valid nodes
   for (let i = 0; i < learningPath.learningPath.length; i++) {
     const step = learningPath.learningPath[i];
-    
+
     if (!step.id || !step.title || !step.nodeId) {
       console.error(`Invalid step ${i + 1} structure:`, step);
-      throw new Error(`Learning step ${i + 1} is missing required fields (id, title, or nodeId)`);
+      throw new Error(
+        `Learning step ${
+          i + 1
+        } is missing required fields (id, title, or nodeId)`
+      );
     }
 
     // Validate nodeId exists in blueprint
     if (!validNodeIds.has(step.nodeId)) {
-      console.warn(`Step ${step.id} references invalid nodeId: ${step.nodeId}. Available nodes:`, Array.from(validNodeIds));
+      console.warn(
+        `Step ${step.id} references invalid nodeId: ${step.nodeId}. Available nodes:`,
+        Array.from(validNodeIds)
+      );
       // Try to find a similar node
-      const similarNode = blueprint.nodes.find((n: any) => 
-        n.label.toLowerCase().includes(step.nodeName?.toLowerCase() || "") ||
-        step.nodeName?.toLowerCase().includes(n.label.toLowerCase())
+      const similarNode = blueprint.nodes.find(
+        (n: any) =>
+          n.label.toLowerCase().includes(step.nodeName?.toLowerCase() || "") ||
+          step.nodeName?.toLowerCase().includes(n.label.toLowerCase())
       );
       if (similarNode) {
-        console.log(`Correcting nodeId from ${step.nodeId} to ${similarNode.id}`);
+        console.log(
+          `Correcting nodeId from ${step.nodeId} to ${similarNode.id}`
+        );
         step.nodeId = similarNode.id;
         step.nodeName = similarNode.label;
       } else {
@@ -372,7 +413,7 @@ Generate a personalized learning path that will help a new developer understand 
     step.checkpoints = step.checkpoints || [];
     step.hints = step.hints || [];
     step.prerequisites = step.prerequisites || [];
-    
+
     // Ensure numeric fields
     step.estimatedTime = step.estimatedTime || 15;
     step.order = step.order || i + 1;
@@ -382,7 +423,7 @@ Generate a personalized learning path that will help a new developer understand 
   learningPath.repoFullName = repoFullName;
   learningPath.generatedAt = new Date().toISOString();
   learningPath.totalSteps = learningPath.learningPath.length;
-  
+
   // Calculate total time if not provided
   if (!learningPath.estimatedTotalTime) {
     learningPath.estimatedTotalTime = learningPath.learningPath.reduce(
@@ -392,10 +433,16 @@ Generate a personalized learning path that will help a new developer understand 
   }
 
   // Ensure top-level fields exist
-  learningPath.overview = learningPath.overview || "A comprehensive learning path through this codebase.";
-  learningPath.keyTakeaways = learningPath.keyTakeaways || ["Understanding the codebase structure"];
+  learningPath.overview =
+    learningPath.overview ||
+    "A comprehensive learning path through this codebase.";
+  learningPath.keyTakeaways = learningPath.keyTakeaways || [
+    "Understanding the codebase structure",
+  ];
 
-  console.log(`Successfully generated learning path with ${learningPath.totalSteps} steps`);
+  console.log(
+    `Successfully generated learning path with ${learningPath.totalSteps} steps`
+  );
   return learningPath;
 }
 

@@ -71,11 +71,13 @@ export async function fetchFileTree(
     // Filter and map the tree
     const fileTree: FileNode[] = treeData.tree
       .filter((item: any) => item.type === "blob" || item.type === "tree")
-      .map((item: any) => ({
-        path: item.path,
-        type: item.type === "blob" ? "file" : "dir",
-        size: item.size,
-      }))
+      .map(
+        (item: any): FileNode => ({
+          path: item.path,
+          type: (item.type === "blob" ? "file" : "dir") as "file" | "dir",
+          size: item.size,
+        })
+      )
       .filter((item: FileNode) => {
         // Exclude common non-essential directories
         const excludeDirs = [
@@ -246,7 +248,7 @@ export function formatFileTreeForAI(fileTree: FileNode[]): string {
   for (const dir of sortedDirs) {
     const files = dirMap.get(dir)!.sort();
     output += `\n${dir}/ (${files.length} files)\n`;
-    
+
     // Show up to 20 files per directory
     const filesToShow = files.slice(0, 20);
     for (const file of filesToShow) {
@@ -254,14 +256,16 @@ export function formatFileTreeForAI(fileTree: FileNode[]): string {
       const displayPath = dir === "." ? file : file;
       output += `  ${displayPath}\n`;
     }
-    
+
     if (files.length > 20) {
       output += `  ... and ${files.length - 20} more files\n`;
     }
   }
 
   if (importantFiles.length > maxFiles) {
-    output += `\n(${importantFiles.length - maxFiles} additional files not shown)\n`;
+    output += `\n(${
+      importantFiles.length - maxFiles
+    } additional files not shown)\n`;
   }
 
   return output;
@@ -275,7 +279,7 @@ export function formatManifestsForAI(manifests: ManifestContent[]): string {
 
   for (const manifest of manifests) {
     output += `\n=== ${manifest.path} ===\n`;
-    
+
     // Truncate very large manifests
     const maxLength = 5000; // ~5000 chars per manifest
     if (manifest.content.length > maxLength) {
@@ -296,10 +300,12 @@ export function formatManifestsForAI(manifests: ManifestContent[]): string {
           };
           output += JSON.stringify(condensed, null, 2);
         } catch {
-          output += manifest.content.substring(0, maxLength) + "\n... (truncated)";
+          output +=
+            manifest.content.substring(0, maxLength) + "\n... (truncated)";
         }
       } else {
-        output += manifest.content.substring(0, maxLength) + "\n... (truncated)";
+        output +=
+          manifest.content.substring(0, maxLength) + "\n... (truncated)";
       }
     } else {
       output += manifest.content;
@@ -308,4 +314,289 @@ export function formatManifestsForAI(manifests: ManifestContent[]): string {
   }
 
   return output;
+}
+
+/**
+ * Repository Chunk - represents a logical section of the codebase
+ */
+export interface RepositoryChunk {
+  id: string;
+  name: string;
+  description: string;
+  files: FileNode[];
+  estimatedTokens: number;
+}
+
+/**
+ * Intelligently divides repository into logical chunks for comprehensive analysis
+ * Uses directory structure, file patterns, and size to create meaningful chunks
+ */
+export function createRepositoryChunks(
+  fileTree: FileNode[],
+  maxTokensPerChunk: number = 150000 // ~150K tokens per chunk
+): RepositoryChunk[] {
+  const chunks: RepositoryChunk[] = [];
+
+  // Get only important files for analysis
+  const importantFiles = filterImportantFiles(fileTree);
+
+  // Group files by top-level directory
+  const dirGroups = new Map<string, FileNode[]>();
+  const rootFiles: FileNode[] = [];
+
+  for (const file of importantFiles) {
+    if (!file.path.includes("/")) {
+      rootFiles.push(file);
+      continue;
+    }
+
+    const topDir = file.path.substring(0, file.path.indexOf("/"));
+    if (!dirGroups.has(topDir)) {
+      dirGroups.set(topDir, []);
+    }
+    dirGroups.get(topDir)!.push(file);
+  }
+
+  // Estimate tokens for a file (rough: 1 token ~= 4 chars, avg file ~500 lines ~15KB)
+  const estimateFileTokens = (file: FileNode): number => {
+    const avgFileSize = 15000; // 15KB average
+    const size = file.size || avgFileSize;
+    return Math.ceil(size / 4);
+  };
+
+  // Add root files as first chunk if any
+  if (rootFiles.length > 0) {
+    chunks.push({
+      id: "root",
+      name: "Root Configuration",
+      description: "Root-level configuration and entry files",
+      files: rootFiles,
+      estimatedTokens: rootFiles.reduce(
+        (sum, f) => sum + estimateFileTokens(f),
+        0
+      ),
+    });
+  }
+
+  // Process each directory group
+  const sortedDirs = Array.from(dirGroups.keys()).sort();
+
+  for (const dir of sortedDirs) {
+    const files = dirGroups.get(dir)!;
+    const totalTokens = files.reduce(
+      (sum, f) => sum + estimateFileTokens(f),
+      0
+    );
+
+    // Determine chunk strategy based on directory name and size
+    const chunkName = getChunkName(dir);
+    const chunkDesc = getChunkDescription(dir, files);
+
+    // If directory is small enough, make it a single chunk
+    if (totalTokens <= maxTokensPerChunk) {
+      chunks.push({
+        id: dir,
+        name: chunkName,
+        description: chunkDesc,
+        files: files,
+        estimatedTokens: totalTokens,
+      });
+    } else {
+      // Directory is too large, split by subdirectories
+      const subDirGroups = new Map<string, FileNode[]>();
+
+      for (const file of files) {
+        const parts = file.path.split("/");
+        if (parts.length <= 2) {
+          // Direct children of this directory
+          const subKey = `${dir}/root`;
+          if (!subDirGroups.has(subKey)) {
+            subDirGroups.set(subKey, []);
+          }
+          subDirGroups.get(subKey)!.push(file);
+        } else {
+          // Group by second-level directory
+          const subDir = parts.slice(0, 2).join("/");
+          if (!subDirGroups.has(subDir)) {
+            subDirGroups.set(subDir, []);
+          }
+          subDirGroups.get(subDir)!.push(file);
+        }
+      }
+
+      // Create chunks for subdirectories
+      for (const [subDir, subFiles] of subDirGroups.entries()) {
+        const subTokens = subFiles.reduce(
+          (sum, f) => sum + estimateFileTokens(f),
+          0
+        );
+        chunks.push({
+          id: subDir,
+          name: `${chunkName} / ${getSubChunkName(subDir)}`,
+          description: `${chunkDesc} - ${getSubChunkName(subDir)} module`,
+          files: subFiles,
+          estimatedTokens: subTokens,
+        });
+      }
+    }
+  }
+
+  return chunks;
+}
+
+/**
+ * Get human-readable name for a chunk based on directory
+ */
+function getChunkName(dir: string): string {
+  const nameMap: Record<string, string> = {
+    api: "API Layer",
+    app: "Application Core",
+    src: "Source Code",
+    lib: "Libraries",
+    components: "UI Components",
+    pages: "Pages & Routes",
+    services: "Business Services",
+    models: "Data Models",
+    utils: "Utilities",
+    helpers: "Helper Functions",
+    middleware: "Middleware",
+    hooks: "React Hooks",
+    context: "Context Providers",
+    store: "State Management",
+    config: "Configuration",
+    types: "Type Definitions",
+    interfaces: "Interfaces",
+    controllers: "Controllers",
+    routes: "Route Handlers",
+    views: "Views",
+    templates: "Templates",
+    auth: "Authentication",
+    database: "Database",
+    db: "Database",
+  };
+
+  return (
+    nameMap[dir.toLowerCase()] || dir.charAt(0).toUpperCase() + dir.slice(1)
+  );
+}
+
+/**
+ * Get description for a chunk
+ */
+function getChunkDescription(dir: string, files: FileNode[]): string {
+  const descMap: Record<string, string> = {
+    api: "API endpoints and route handlers",
+    app: "Main application logic and structure",
+    src: "Core source code and business logic",
+    lib: "Shared libraries and utilities",
+    components: "Reusable UI components",
+    pages: "Page components and routing",
+    services: "Business logic and external service integrations",
+    models: "Data models and schemas",
+    utils: "Utility functions and helpers",
+    middleware: "Request/response middleware",
+    hooks: "Custom React hooks",
+    context: "React context and global state",
+    store: "State management (Redux/Zustand/etc)",
+    config: "Configuration files and constants",
+    auth: "Authentication and authorization logic",
+    database: "Database schemas and migrations",
+  };
+
+  return descMap[dir.toLowerCase()] || `${files.length} files in ${dir}`;
+}
+
+/**
+ * Get name for a sub-chunk
+ */
+function getSubChunkName(subDir: string): string {
+  const parts = subDir.split("/");
+  const lastPart = parts[parts.length - 1];
+  return lastPart.charAt(0).toUpperCase() + lastPart.slice(1);
+}
+
+/**
+ * Format a chunk for AI analysis
+ */
+export function formatChunkForAI(chunk: RepositoryChunk): string {
+  let output = `CHUNK: ${chunk.name}\n`;
+  output += `DESCRIPTION: ${chunk.description}\n`;
+  output += `FILES (${chunk.files.length} total):\n\n`;
+
+  // Group files by immediate parent directory for better structure
+  const grouped = new Map<string, string[]>();
+
+  for (const file of chunk.files) {
+    const dir = file.path.includes("/")
+      ? file.path.substring(0, file.path.lastIndexOf("/"))
+      : ".";
+
+    if (!grouped.has(dir)) {
+      grouped.set(dir, []);
+    }
+    grouped.get(dir)!.push(file.path);
+  }
+
+  // Output grouped structure
+  const sortedDirs = Array.from(grouped.keys()).sort();
+  for (const dir of sortedDirs) {
+    const files = grouped.get(dir)!.sort();
+    output += `${dir}/\n`;
+    for (const file of files) {
+      output += `  ${file}\n`;
+    }
+    output += "\n";
+  }
+
+  return output;
+}
+
+/**
+ * Fetch file contents for a specific set of files
+ * Used for deep analysis of critical files
+ */
+export async function fetchFileContents(
+  owner: string,
+  repo: string,
+  installationId: string,
+  filePaths: string[],
+  maxFileSizeKB: number = 100 // Skip files larger than 100KB
+): Promise<Map<string, string>> {
+  const app = getGitHubApp();
+  const octokit = await app.getInstallationOctokit(parseInt(installationId));
+  const contents = new Map<string, string>();
+
+  // Limit to first 50 files to avoid rate limits
+  const limitedPaths = filePaths.slice(0, 50);
+
+  for (const path of limitedPaths) {
+    try {
+      const { data } = await octokit.request(
+        "GET /repos/{owner}/{repo}/contents/{path}",
+        {
+          owner,
+          repo,
+          path,
+        }
+      );
+
+      if ("content" in data && data.content) {
+        // Check file size
+        const sizeKB = data.size / 1024;
+        if (sizeKB > maxFileSizeKB) {
+          console.log(`Skipping large file: ${path} (${sizeKB.toFixed(2)}KB)`);
+          continue;
+        }
+
+        // Decode base64 content
+        const content = Buffer.from(data.content, "base64").toString("utf-8");
+        contents.set(path, content);
+      }
+    } catch (error) {
+      console.warn(`Failed to fetch ${path}:`, error);
+      // Continue with other files
+    }
+  }
+
+  return contents;
 }

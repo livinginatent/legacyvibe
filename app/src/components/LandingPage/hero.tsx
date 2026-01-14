@@ -19,29 +19,37 @@ const Hero = () => {
           <div className="space-y-8">
             <div className="space-y-6">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-foreground animate-fade-in-up">
-                Don't Fear the Code{" "}
+                Understand Your{" "}
                 <span className="text-primary text-glow">
-                  You Didn't Write.
+                  Codebase in Minutes
                 </span>
               </h1>
 
               <p className="font-mono text-lg md:text-xl text-muted-foreground leading-relaxed animate-fade-in-up animation-delay-200">
-                The automated flight recorder for AI-generated apps. Turn your
-                Vibe Coding chaos into a maintainable blueprint.
+                AI-powered architecture analysis. Visualize business logic, track technical debt, 
+                analyze impact, and onboard new developers—all from one dashboard.
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 animate-fade-in-up animation-delay-400">
               <Button variant="hero" size="lg">
-                Generate Founder's Manual
+                Start Free Analysis
+              </Button>
+              <Button variant="outline" size="lg" className="font-mono">
+                View Pricing
               </Button>
             </div>
 
-            <p className="font-mono text-sm text-muted-foreground/70 animate-fade-in-up animation-delay-600">
-              Compatible with <span className="text-primary/80">Cursor</span>,{" "}
-              <span className="text-primary/80">Bolt.new</span>, &{" "}
-              <span className="text-primary/80">ChatGPT history</span>.
-            </p>
+            <div className="flex items-center gap-6 animate-fade-in-up animation-delay-600">
+              <p className="font-mono text-sm text-muted-foreground/70">
+                <span className="text-primary/80 font-semibold">$14.99</span>{" "}
+                <span className="text-muted-foreground/50">/month</span>
+              </p>
+              <div className="h-4 w-px bg-border" />
+              <p className="font-mono text-sm text-muted-foreground/70">
+                <span className="text-primary/80">5 scans</span> per month
+              </p>
+            </div>
           </div>
 
           {/* Right visual */}

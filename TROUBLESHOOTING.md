@@ -148,4 +148,4 @@ When things aren't working:
 2. Restart the Next.js dev server
 3. Check that all npm packages are installed (`npm install`)
 4. Verify Node.js version is 18+
-5. Check GitHub App webhook settings (should be disabled for local dev)
+5. Verify GitHub App permissions are correctly configured
