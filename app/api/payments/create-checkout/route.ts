@@ -1,164 +1,210 @@
 /**
  * Dodo Payments Checkout Session Creation
- * Creates a checkout session for one-time $14.99 payment
+ * Creates a checkout session for one-time $14.99 payment using official SDK
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/app/src/utils/supabase/server";
+import { getDodo, LEGACYVIBE_PRODUCT_ID } from "@/lib/dodo/server";
 
 export const dynamic = "force-dynamic";
 
-interface CreateCheckoutRequest {
-  returnUrl?: string;
-}
-
-/**
- * POST /api/payments/create-checkout
- * Creates a Dodo Payments checkout session
- */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    // Get user authentication
+    // Check if product ID is configured
+    if (!LEGACYVIBE_PRODUCT_ID) {
+      console.error("DODO_PAYMENTS_PRODUCT_ID is not set");
+      return NextResponse.json(
+        { error: "Payment system not configured" },
+        { status: 500 }
+      );
+    }
+
     const cookieStore = cookies();
     const supabase = createClient(cookieStore);
+
+    // Get the current user
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (authError) {
+      console.error("Auth error:", authError);
+      return NextResponse.json(
+        { error: "Authentication failed" },
+        { status: 401 }
+      );
     }
 
-    // Get user email and name
-    const userEmail = user.email;
-    const userName = user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
-
-    // Parse request body
-    const body: CreateCheckoutRequest = await request.json().catch(() => ({}));
-    const returnUrl = body.returnUrl || `${request.nextUrl.origin}/dashboard/action/payment-success`;
-
-    // Get Dodo Payments configuration
-    const apiKey = process.env.DODO_PAYMENTS_API_KEY;
-    const productId = process.env.DODO_PAYMENTS_PRODUCT_ID; // Product ID from Dodo dashboard
-    const environment = process.env.DODO_PAYMENTS_ENVIRONMENT || "test_mode"; // 'test_mode' or 'live_mode'
-    const baseUrl = environment === "test_mode" 
-      ? "https://test.dodopayments.com"
-      : "https://api.dodopayments.com";
-
-    if (!apiKey) {
-      console.error("DODO_PAYMENTS_API_KEY not configured");
+    if (!user) {
       return NextResponse.json(
-        { error: "Payment service not configured" },
+        { error: "You must be logged in to purchase" },
+        { status: 401 }
+      );
+    }
+
+    const customerEmail = user.email || "";
+    const customerName =
+      user.user_metadata?.full_name || user.email?.split("@")[0] || "Customer";
+
+    // Verify environment configuration
+    const isLiveMode = process.env.DODO_LIVE_MODE === "true";
+    const hasApiKey = !!process.env.DODO_PAYMENTS_API_KEY;
+    const hasProductId = !!LEGACYVIBE_PRODUCT_ID;
+    const hasSiteUrl = !!process.env.NEXT_PUBLIC_SITE_URL;
+
+    console.log(`[Checkout] Configuration check:`, {
+      environment: isLiveMode ? "live" : "test",
+      hasApiKey,
+      hasProductId,
+      hasSiteUrl,
+      productId: LEGACYVIBE_PRODUCT_ID,
+      siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+    });
+
+    if (!hasApiKey) {
+      console.error("[Checkout] Missing DODO_PAYMENTS_API_KEY");
+      return NextResponse.json(
+        { error: "Payment system configuration error" },
         { status: 500 }
       );
     }
 
-    if (!productId) {
-      console.error("DODO_PAYMENTS_PRODUCT_ID not configured");
+    if (!hasProductId) {
+      console.error("[Checkout] Missing DODO_PAYMENTS_PRODUCT_ID");
       return NextResponse.json(
-        { error: "Product not configured" },
+        { error: "Product configuration error" },
         { status: 500 }
       );
     }
 
-    // Check if user already has an active payment
+    if (!hasSiteUrl) {
+      console.error("[Checkout] Missing NEXT_PUBLIC_SITE_URL");
+      return NextResponse.json(
+        { error: "Site URL configuration error" },
+        { status: 500 }
+      );
+    }
+
+    // Check if user already has active scans (optional - allow re-purchase)
     const { data: usage } = await supabase
       .from("user_usage")
-      .select("has_paid, payment_status")
+      .select("has_paid, scans_used, scans_limit")
       .eq("user_id", user.id)
       .single();
 
     // Allow re-purchase if they've used all scans
-    const { data: currentUsage } = await supabase
-      .from("user_usage")
-      .select("scans_used, scans_limit")
-      .eq("user_id", user.id)
-      .single();
-
-    const needsPayment = !usage?.has_paid || 
-      (currentUsage && currentUsage.scans_used >= currentUsage.scans_limit);
+    const needsPayment =
+      !usage?.has_paid || (usage && usage.scans_used >= usage.scans_limit);
 
     if (!needsPayment && usage?.has_paid) {
       return NextResponse.json(
-        { error: "Payment already completed" },
+        { error: "You still have scans available" },
         { status: 400 }
       );
     }
 
-    // Create checkout session with Dodo Payments
-    const checkoutResponse = await fetch(`${baseUrl}/checkouts`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+    const dodo = getDodo();
+
+    console.log(
+      `[Checkout] Creating session for user ${user.id} (${customerEmail})`
+    );
+    console.log(`[Checkout] Product ID: ${LEGACYVIBE_PRODUCT_ID}`);
+    console.log(
+      `[Checkout] Return URL: ${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/action/payment-success`
+    );
+
+    // Create a Dodo Payments Checkout Session using official SDK
+    try {
+      const session = await dodo.checkoutSessions.create({
         product_cart: [
           {
-            product_id: productId,
+            product_id: LEGACYVIBE_PRODUCT_ID,
             quantity: 1,
           },
         ],
         customer: {
-          email: userEmail,
-          name: userName,
+          email: customerEmail,
+          name: customerName,
         },
-        return_url: returnUrl,
+        // Return URL after successful payment
+        return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/action/payment-success`,
+        // Pass user ID in metadata for webhook
         metadata: {
-          user_id: user.id,
-          payment_type: "one_time",
+          supabase_user_id: user.id,
         },
-      }),
-    });
+      });
 
-    if (!checkoutResponse.ok) {
-      const errorData = await checkoutResponse.json().catch(() => ({}));
-      console.error("Dodo Payments checkout creation failed:", errorData);
-      return NextResponse.json(
-        {
-          error: "Failed to create checkout session",
-          details: errorData,
-        },
-        { status: checkoutResponse.status }
-      );
-    }
-
-    const checkoutData = await checkoutResponse.json();
-
-    if (!checkoutData.checkout_url) {
-      console.error("No checkout_url in response:", checkoutData);
-      return NextResponse.json(
-        { error: "Invalid checkout session response" },
-        { status: 500 }
-      );
-    }
-
-    // Store pending payment info (optional, for tracking)
-    await supabase.from("user_usage").upsert(
-      {
-        user_id: user.id,
-        payment_status: "pending",
-        payment_id: checkoutData.checkout_id || checkoutData.id,
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "user_id",
+      if (!session.checkout_url) {
+        console.error("No checkout URL returned from Dodo:", session);
+        return NextResponse.json(
+          { error: "Failed to generate checkout URL" },
+          { status: 500 }
+        );
       }
-    );
 
-    return NextResponse.json({
-      checkoutUrl: checkoutData.checkout_url,
-      checkoutId: checkoutData.checkout_id || checkoutData.id,
-      environment,
-    });
-  } catch (error) {
-    console.error("Checkout creation error:", error);
+      // Store pending payment info
+      await supabase.from("user_usage").upsert(
+        {
+          user_id: user.id,
+          payment_status: "pending",
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+        }
+      );
+
+      return NextResponse.json({ checkoutUrl: session.checkout_url });
+    } catch (paymentError: unknown) {
+      console.error("Error creating Dodo checkout session:", paymentError);
+
+      // Extract more detailed error information
+      let errorMessage = "Unknown error";
+      let statusCode = 500;
+
+      if (paymentError instanceof Error) {
+        errorMessage = paymentError.message;
+
+        // Check if it's a 401 error (authentication issue)
+        if (
+          errorMessage.includes("401") ||
+          errorMessage.toLowerCase().includes("unauthorized")
+        ) {
+          statusCode = 401;
+          errorMessage =
+            "Authentication failed with payment provider. Please verify your API key is correct for live mode.";
+          console.error("[Checkout] 401 Error - Possible causes:");
+          console.error(
+            "  1. API key doesn't match the environment (test vs live)"
+          );
+          console.error("  2. API key is incorrect or expired");
+          console.error("  3. Product ID doesn't exist in live mode");
+          console.error(`  Current mode: ${isLiveMode ? "live" : "test"}`);
+        }
+      }
+
+      // Log the full error for debugging
+      if (paymentError && typeof paymentError === "object") {
+        console.error(
+          "[Checkout] Full error object:",
+          JSON.stringify(paymentError, null, 2)
+        );
+      }
+
+      return NextResponse.json(
+        { error: `Checkout creation failed: ${errorMessage}` },
+        { status: statusCode }
+      );
+    }
+  } catch (error: unknown) {
+    console.error("Unexpected error in checkout:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
-      },
+      { error: `Checkout failed: ${errorMessage}` },
       { status: 500 }
     );
   }

@@ -1,186 +1,198 @@
 /**
  * Dodo Payments Webhook Handler
- * Verifies and processes payment completion events
+ * Verifies and processes payment completion events using standardwebhooks
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+import { Webhook } from "standardwebhooks";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-// Standard Webhooks verification (simplified - you may want to use the standardwebhooks library)
-async function verifyWebhook(
-  rawBody: string,
-  signature: string | null,
-  webhookId: string | null,
-  timestamp: string | null
-): Promise<boolean> {
-  const webhookSecret = process.env.DODO_WEBHOOK_KEY;
+const webhookSecret = process.env.DODO_WEBHOOK_SECRET!;
+
+// Dodo Payments webhook event types
+type DodoWebhookEvent = {
+  business_id: string;
+  timestamp: string;
+  type: string;
+  data: {
+    payment_id?: string;
+    status?: string;
+    customer?: {
+      customer_id: string;
+      email: string;
+      name?: string;
+    };
+    product_id?: string;
+    amount?: number;
+    metadata?: Record<string, string>;
+  };
+};
+
+export async function POST(request: Request) {
+  const body = await request.text();
+  const headersList = await headers();
+
+  // Get webhook headers
+  const webhookId = headersList.get("webhook-id");
+  const webhookTimestamp = headersList.get("webhook-timestamp");
+  const webhookSignature = headersList.get("webhook-signature");
+
+  if (!webhookId || !webhookTimestamp || !webhookSignature) {
+    console.error("[Dodo Webhook] Missing webhook headers");
+    return NextResponse.json(
+      { error: "Missing webhook headers" },
+      { status: 400 }
+    );
+  }
 
   if (!webhookSecret) {
-    console.error("DODO_WEBHOOK_KEY not configured");
-    return false;
+    console.error("[Dodo Webhook] DODO_WEBHOOK_SECRET not configured");
+    return NextResponse.json(
+      { error: "Webhook secret not configured" },
+      { status: 500 }
+    );
   }
 
-  // For production, use the standardwebhooks library for proper verification
-  // This is a simplified check - Dodo uses Standard Webhooks spec
-  // https://standardwebhooks.com/
-  
-  // Basic verification: check that signature exists
-  // In production, implement proper HMAC verification
-  if (!signature || !webhookId || !timestamp) {
-    return false;
-  }
+  // Verify webhook signature using standardwebhooks
+  const webhook = new Webhook(webhookSecret);
 
-  // TODO: Implement proper Standard Webhooks verification
-  // For now, we'll trust the webhook if it has the required headers
-  // In production, use: import { Webhook } from "standardwebhooks";
-  return true;
-}
+  let event: DodoWebhookEvent;
 
-/**
- * POST /api/payments/webhook
- * Handles Dodo Payments webhook events
- */
-export async function POST(request: NextRequest) {
   try {
-    const headersList = request.headers;
-    const rawBody = await request.text();
+    event = webhook.verify(body, {
+      "webhook-id": webhookId,
+      "webhook-timestamp": webhookTimestamp,
+      "webhook-signature": webhookSignature,
+    }) as DodoWebhookEvent;
+  } catch (err) {
+    console.error("[Dodo Webhook] Signature verification failed:", err);
+    return NextResponse.json(
+      { error: "Webhook signature verification failed" },
+      { status: 400 }
+    );
+  }
 
-    // Get webhook headers (Standard Webhooks spec)
-    const webhookId = headersList.get("webhook-id");
-    const signature = headersList.get("webhook-signature");
-    const timestamp = headersList.get("webhook-timestamp");
+  console.log(`[Dodo Webhook] Received event: ${event.type}`);
+  console.log(
+    `[Dodo Webhook] Event data:`,
+    JSON.stringify(event.data, null, 2)
+  );
 
-    // Verify webhook signature
-    const isValid = await verifyWebhook(rawBody, signature, webhookId, timestamp);
-
-    if (!isValid) {
-      console.error("Invalid webhook signature");
-      return NextResponse.json(
-        { error: "Invalid signature" },
-        { status: 401 }
-      );
-    }
-
-    // Parse webhook payload
-    const payload = JSON.parse(rawBody);
-
-    console.log("[Dodo Webhook] Event received:", payload.type || payload.event);
-
-    // Handle payment succeeded event
-    if (
-      payload.type === "payment.succeeded" ||
-      payload.event === "payment.succeeded" ||
-      (payload.data && payload.data.status === "succeeded")
-    ) {
-      const paymentData = payload.data || payload;
-      const paymentId = paymentData.payment_id || paymentData.id;
-      const userId = paymentData.metadata?.user_id;
-      const amount = paymentData.amount || paymentData.amount_total || 1499; // Default to $14.99
-
-      if (!userId) {
-        console.error("No user_id in webhook payload");
-        return NextResponse.json(
-          { error: "Missing user_id" },
-          { status: 400 }
-        );
+  try {
+    switch (event.type) {
+      case "payment.succeeded": {
+        await handlePaymentSucceeded(event);
+        break;
       }
 
-      // Update user payment status and grant scans
-      // Use service role for admin operations (bypasses RLS)
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!serviceRoleKey) {
-        console.error("SUPABASE_SERVICE_ROLE_KEY not configured");
-        return NextResponse.json(
-          { error: "Server configuration error" },
-          { status: 500 }
-        );
+      case "payment.failed": {
+        await handlePaymentFailed(event);
+        break;
       }
 
-      // Create admin client with service role
-      const { createClient: createAdminClient } = await import("@supabase/supabase-js");
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const supabase = createAdminClient(supabaseUrl, serviceRoleKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      });
-
-      // Use service role for admin operations (webhook)
-      // Note: You may need to use SUPABASE_SERVICE_ROLE_KEY for this
-      const { error: updateError } = await supabase
-        .from("user_usage")
-        .upsert(
-          {
-            user_id: userId,
-            has_paid: true,
-            payment_id: paymentId,
-            payment_date: new Date().toISOString(),
-            payment_amount: amount,
-            payment_status: "succeeded",
-            scans_used: 0, // Reset scans when payment succeeds
-            scans_limit: 5,
-            period_start: new Date().toISOString(),
-            period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "user_id",
-          }
-        );
-
-      if (updateError) {
-        console.error("Failed to update payment status:", updateError);
-        return NextResponse.json(
-          { error: "Failed to process payment" },
-          { status: 500 }
-        );
-      }
-
-      console.log(`[Dodo Webhook] Payment succeeded for user ${userId}, payment ${paymentId}`);
-    }
-
-    // Handle payment failed event (optional - for logging)
-    if (
-      payload.type === "payment.failed" ||
-      payload.event === "payment.failed" ||
-      (payload.data && payload.data.status === "failed")
-    ) {
-      const paymentData = payload.data || payload;
-      const userId = paymentData.metadata?.user_id;
-
-      if (userId) {
-        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        if (serviceRoleKey) {
-          const { createClient: createAdminClient } = await import("@supabase/supabase-js");
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-          const supabase = createAdminClient(supabaseUrl, serviceRoleKey, {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false,
-            },
-          });
-
-          await supabase
-            .from("user_usage")
-            .update({
-              payment_status: "failed",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", userId);
-        }
-      }
+      default:
+        console.log(`[Dodo Webhook] Unhandled event type: ${event.type}`);
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Webhook processing error:", error);
+    console.error("[Dodo Webhook] Error processing:", error);
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Internal server error",
-      },
+      { error: "Webhook processing failed" },
       { status: 500 }
     );
   }
+}
+
+/**
+ * Handle successful payment - grant user 5 scans
+ */
+async function handlePaymentSucceeded(event: DodoWebhookEvent) {
+  const userId = event.data.metadata?.supabase_user_id;
+  const paymentId = event.data.payment_id;
+  const amount = event.data.amount || 1499; // Default to $14.99 in cents
+
+  if (!userId) {
+    console.error("[Dodo Webhook] No supabase_user_id in metadata");
+    // Try to find by customer email as fallback
+    const email = event.data.customer?.email;
+    if (email) {
+      const { data } = await supabaseAdmin.auth.admin.listUsers();
+      const user = data?.users?.find((u) => u.email === email);
+      if (user) {
+        await grantScans(user.id, paymentId, amount);
+        return;
+      }
+    }
+    return;
+  }
+
+  await grantScans(userId, paymentId, amount);
+}
+
+/**
+ * Grant scans to user and update payment status
+ */
+async function grantScans(userId: string, paymentId?: string, amount?: number) {
+  const { error } = await supabaseAdmin.from("user_usage").upsert(
+    {
+      user_id: userId,
+      has_paid: true,
+      payment_id: paymentId,
+      payment_date: new Date().toISOString(),
+      payment_amount: amount,
+      payment_status: "succeeded",
+      scans_used: 0, // Reset scans when payment succeeds
+      scans_limit: 5,
+      period_start: new Date().toISOString(),
+      period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+      updated_at: new Date().toISOString(),
+    },
+    {
+      onConflict: "user_id",
+    }
+  );
+
+  if (error) {
+    console.error("[Dodo Webhook] Error granting scans:", error);
+    throw error;
+  }
+
+  console.log(
+    `[Dodo Webhook] Granted 5 scans to user ${userId} (payment: ${paymentId})`
+  );
+}
+
+/**
+ * Handle failed payment
+ */
+async function handlePaymentFailed(event: DodoWebhookEvent) {
+  const userId = event.data.metadata?.supabase_user_id;
+
+  if (!userId) {
+    console.error(
+      "[Dodo Webhook] No supabase_user_id in metadata for failed payment"
+    );
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("user_usage")
+    .update({
+      payment_status: "failed",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error(
+      "[Dodo Webhook] Error updating failed payment status:",
+      error
+    );
+  }
+
+  console.log(`[Dodo Webhook] Payment failed for user ${userId}`);
 }

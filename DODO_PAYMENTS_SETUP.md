@@ -1,65 +1,101 @@
 # Dodo Payments Integration Setup Guide 💳
 
 ## Overview
+
 This guide explains how to set up Dodo Payments for one-time $14.99 payments to unlock 5 repository scans.
+
+**Now uses the official `dodopayments` SDK and `standardwebhooks` for proper verification.**
 
 ---
 
 ## ✅ What's Implemented
 
-### 1. **Database Migration**
+### 1. **Dodo SDK Client**
+
+File: `lib/dodo/server.ts`
+
+**Features**:
+
+- ✅ Lazy-initialized Dodo Payments SDK client
+- ✅ Automatic test/live mode switching via `DODO_LIVE_MODE`
+- ✅ Centralized configuration
+
+### 2. **Supabase Admin Client**
+
+File: `lib/supabase/admin.ts`
+
+**Features**:
+
+- ✅ Service role client for webhook operations
+- ✅ Bypasses RLS for admin updates
+
+### 3. **Database Migration**
+
 File: `supabase/migrations/007_add_payment_tracking.sql`
 
 **Features**:
+
 - ✅ Adds `has_paid` column to track payment status
 - ✅ Stores `payment_id`, `payment_date`, `payment_amount`, `payment_status`
 - ✅ Indexes for payment lookups
 
 **Apply Migration**:
+
 ```bash
 # Apply via Supabase dashboard SQL editor or CLI
 psql <your-connection-string> < supabase/migrations/007_add_payment_tracking.sql
 ```
 
-### 2. **Checkout Session API**
+### 4. **Checkout Session API**
+
 File: `app/api/payments/create-checkout/route.ts`
 
 **Features**:
-- ✅ Creates Dodo Payments checkout session
-- ✅ Supports test/live modes via environment variable
+
+- ✅ Uses official `dodopayments` SDK
+- ✅ Supports test/live modes via `DODO_LIVE_MODE` environment variable
 - ✅ Returns checkout URL for redirect
+- ✅ Detailed error logging for debugging
 - ✅ Prevents duplicate payments
 
-### 3. **Webhook Handler**
+### 5. **Webhook Handler**
+
 File: `app/api/payments/webhook/route.ts`
 
 **Features**:
-- ✅ Verifies webhook signatures (Standard Webhooks spec)
+
+- ✅ Uses `standardwebhooks` library for proper signature verification
 - ✅ Processes `payment.succeeded` events
 - ✅ Updates user payment status and grants 5 scans
 - ✅ Handles payment failures
 
-### 4. **Payment Success Page**
+### 6. **Payment Success Page**
+
 File: `app/dashboard/action/payment-success/page.tsx`
 
 **Features**:
-- ✅ Confirms successful payment
+
+- ✅ Auto-polls for payment confirmation
 - ✅ Shows available scans
 - ✅ Redirects to dashboard
 
-### 5. **Usage Gating**
+### 7. **Usage Gating**
+
 File: `app/api/analyze/route.ts`
 
 **Features**:
+
 - ✅ Checks `has_paid` before allowing scans
 - ✅ Returns `PAYMENT_REQUIRED` (402) if not paid
 - ✅ Returns `USAGE_LIMIT_REACHED` (429) when scans exhausted
 - ✅ Prompts for re-payment when limit reached
 
-### 6. **Paywall UI**
+### 8. **Paywall UI**
+
 File: `app/dashboard/action/[repo]/action-interface.tsx`
 
 **Features**:
+
 - ✅ Modal paywall when payment required
 - ✅ Shows $14.99 pricing and benefits
 - ✅ Redirects to Dodo Payments hosted checkout
@@ -69,30 +105,62 @@ File: `app/dashboard/action/[repo]/action-interface.tsx`
 
 ## 🔧 Environment Variables
 
-Add these to your `.env.local`:
+Add these to your `.env.local` (and production environment):
 
 ```bash
 # Dodo Payments Configuration
-DODO_PAYMENTS_API_KEY=your_api_key_here
-DODO_PAYMENTS_PRODUCT_ID=prod_xxxxx  # Product ID from Dodo dashboard
-DODO_PAYMENTS_ENVIRONMENT=test_mode    # 'test_mode' or 'live_mode'
-DODO_WEBHOOK_KEY=your_webhook_secret_here
+DODO_PAYMENTS_API_KEY=your_api_key_here     # API key from Dodo dashboard
+DODO_PAYMENTS_PRODUCT_ID=prod_xxxxx          # Product ID from Dodo dashboard
+DODO_LIVE_MODE=true                          # Set to "true" for production
+DODO_WEBHOOK_SECRET=your_webhook_secret_here # Webhook secret from Dodo
+
+# Supabase (required for webhook admin operations)
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Site URL (required for checkout return URL)
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
 ```
+
+### Environment Mode
+
+- **Test Mode** (default): Set `DODO_LIVE_MODE=false` or omit it
+
+  - Use test API key from Dodo dashboard
+  - Test product ID from test mode
+  - Test webhook secret
+
+- **Live Mode**: Set `DODO_LIVE_MODE=true`
+  - Use **live** API key from Dodo dashboard
+  - **Live** product ID (create product in live mode)
+  - **Live** webhook secret
+
+⚠️ **Important**: Test and Live modes have separate:
+
+- API keys
+- Product IDs
+- Webhook secrets
+
+Make sure all three match the same environment!
 
 ### Getting Your Credentials
 
 1. **API Key**:
+
    - Go to [Dodo Payments Dashboard](https://app.dodopayments.com/)
    - Navigate to **Developer > API**
+   - Toggle to **Live** mode if going to production
    - Generate and copy your API key
 
 2. **Product ID**:
+
    - Go to **Products** in dashboard
+   - Toggle to **Live** mode if going to production
    - Create a product with price **$14.99** (one-time payment)
    - Copy the Product ID (starts with `prod_`)
 
 3. **Webhook Secret**:
    - Go to **Developer > Webhooks**
+   - Toggle to **Live** mode if going to production
    - Create webhook URL: `https://your-domain.com/api/payments/webhook`
    - Copy the webhook secret key
 
@@ -100,38 +168,53 @@ DODO_WEBHOOK_KEY=your_webhook_secret_here
 
 ## 🚀 Setup Steps
 
-### Step 1: Create Product in Dodo Dashboard
+### Step 1: Install Dependencies
+
+```bash
+npm install dodopayments standardwebhooks
+```
+
+### Step 2: Create Product in Dodo Dashboard
 
 1. Log into [Dodo Payments Dashboard](https://app.dodopayments.com/)
-2. Go to **Products**
-3. Click **Create Product**
-4. Set:
+2. **Toggle to Live mode** if deploying to production
+3. Go to **Products**
+4. Click **Create Product**
+5. Set:
    - **Name**: "LegacyVibe - 5 Scans"
    - **Price**: $14.99
    - **Type**: One-time payment
-5. Copy the **Product ID** (e.g., `prod_abc123`)
+6. Copy the **Product ID** (e.g., `prod_abc123`)
 
-### Step 2: Configure Webhook
+### Step 3: Configure Webhook
 
 1. Go to **Developer > Webhooks**
-2. Click **Create Webhook**
-3. Set:
+2. **Toggle to Live mode** if deploying to production
+3. Click **Create Webhook**
+4. Set:
    - **URL**: `https://your-domain.com/api/payments/webhook`
    - **Events**: Select `payment.succeeded` and `payment.failed`
-4. Copy the **Webhook Secret Key**
+5. Copy the **Webhook Secret Key**
 
-### Step 3: Set Environment Variables
+### Step 4: Set Environment Variables
 
-Add to `.env.local`:
+Add to your production environment (Vercel, etc.):
 
 ```bash
-DODO_PAYMENTS_API_KEY=sk_test_xxxxx  # or sk_live_xxxxx for production
-DODO_PAYMENTS_PRODUCT_ID=prod_xxxxx
-DODO_PAYMENTS_ENVIRONMENT=test_mode   # Change to 'live_mode' for production
-DODO_WEBHOOK_KEY=whsec_xxxxx
+# Dodo Payments - LIVE MODE
+DODO_PAYMENTS_API_KEY=sk_live_xxxxx      # LIVE API key
+DODO_PAYMENTS_PRODUCT_ID=prod_xxxxx      # LIVE product ID
+DODO_LIVE_MODE=true                       # Enable live mode
+DODO_WEBHOOK_SECRET=whsec_xxxxx          # LIVE webhook secret
+
+# Supabase
+SUPABASE_SERVICE_ROLE_KEY=eyJxxx...      # Service role key
+
+# Site URL
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
 ```
 
-### Step 4: Apply Database Migration
+### Step 5: Apply Database Migration
 
 Run the migration to add payment tracking columns:
 
@@ -144,19 +227,24 @@ ADD COLUMN IF NOT EXISTS payment_date timestamp with time zone,
 ADD COLUMN IF NOT EXISTS payment_amount integer,
 ADD COLUMN IF NOT EXISTS payment_status text;
 
-CREATE INDEX IF NOT EXISTS idx_user_usage_payment_id 
-  ON public.user_usage(payment_id) 
+CREATE INDEX IF NOT EXISTS idx_user_usage_payment_id
+  ON public.user_usage(payment_id)
   WHERE payment_id IS NOT NULL;
 ```
 
-### Step 5: Test the Integration
+### Step 6: Deploy and Test
 
-1. **Test Mode**:
-   - Set `DODO_PAYMENTS_ENVIRONMENT=test_mode`
-   - Use test API key from dashboard
-   - Test payment flow with test card numbers
+1. **Deploy** your application
+2. **Test the payment flow**:
 
-2. **Verify Webhook**:
+   - Click "START ANALYSIS" on a repo
+   - Should see the paywall modal
+   - Click "Pay $14.99"
+   - Complete payment on Dodo checkout
+   - Should redirect to success page
+   - Check that `has_paid = true` in database
+
+3. **Verify Webhook**:
    - Check webhook deliveries in Dodo dashboard
    - Verify payment status updates in database
 
@@ -165,6 +253,7 @@ CREATE INDEX IF NOT EXISTS idx_user_usage_payment_id
 ## 🎯 User Flow
 
 ### **First-Time User**
+
 ```
 User clicks "START ANALYSIS"
          ↓
@@ -186,6 +275,7 @@ User can now analyze repositories
 ```
 
 ### **User Hits Limit**
+
 ```
 User uses all 5 scans
          ↓
@@ -204,11 +294,11 @@ Webhook resets scans_used = 0, grants 5 more scans
 
 ## 🔒 Security Notes
 
-1. **Webhook Verification**: Currently uses basic header checks. For production, implement proper Standard Webhooks HMAC verification using the `standardwebhooks` library.
+1. **Webhook Verification**: Now uses the official `standardwebhooks` library for proper HMAC signature verification.
 
-2. **Service Role**: The webhook handler may need `SUPABASE_SERVICE_ROLE_KEY` to update user records without RLS restrictions.
+2. **Service Role**: The webhook handler uses `SUPABASE_SERVICE_ROLE_KEY` to update user records, bypassing RLS.
 
-3. **Payment Amount**: Hardcoded to $14.99 (1499 cents). Update `payment_amount` in webhook handler if pricing changes.
+3. **Payment Amount**: Configured in Dodo dashboard. The webhook receives the actual amount from the event.
 
 ---
 
