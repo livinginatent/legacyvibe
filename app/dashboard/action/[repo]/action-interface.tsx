@@ -403,6 +403,11 @@ export function ActionInterface({
   const [isLoadingUsage, setIsLoadingUsage] = useState(true);
   const [showUsageWarning, setShowUsageWarning] = useState(false);
 
+  // Payment state
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
@@ -936,13 +941,19 @@ export function ActionInterface({
       });
 
       if (!response.ok) {
-        // Handle non-streaming errors (like usage limit)
+        // Handle non-streaming errors (like usage limit or payment required)
         try {
           const errorData = await response.json();
-          if (errorData.error === "USAGE_LIMIT_REACHED") {
+          if (
+            errorData.error === "PAYMENT_REQUIRED" ||
+            errorData.error === "USAGE_LIMIT_REACHED"
+          ) {
             setError(errorData.message);
             if (errorData.usage) {
               setUsageData(errorData.usage);
+            }
+            if (errorData.requiresPayment) {
+              setShowPaywall(true);
             }
             return;
           }
@@ -1050,6 +1061,41 @@ export function ActionInterface({
         return <CheckCircle2 className="w-4 h-4" />;
       default:
         return null;
+    }
+  };
+
+  // Payment handler
+  const handleCreateCheckout = async () => {
+    setIsCreatingCheckout(true);
+    setPaymentError(null);
+
+    try {
+      const response = await fetch("/api/payments/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          returnUrl: `${window.location.origin}/dashboard/action/payment-success`,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create checkout");
+      }
+
+      const data = await response.json();
+
+      if (data.checkoutUrl) {
+        // Redirect to Dodo Payments hosted checkout
+        window.location.href = data.checkoutUrl;
+      } else {
+        throw new Error("No checkout URL received");
+      }
+    } catch (err) {
+      setPaymentError(
+        err instanceof Error ? err.message : "Failed to start payment"
+      );
+      setIsCreatingCheckout(false);
     }
   };
 
@@ -1304,8 +1350,92 @@ export function ActionInterface({
         </div>
       )}
 
+      {/* Paywall Modal */}
+      {showPaywall && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="glass-card border border-primary/50 bg-black p-8 max-w-md w-full space-y-6 animate-fade-in-up">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center mx-auto mb-4">
+                <Zap className="w-8 h-8 text-primary" />
+              </div>
+              <h2 className="text-2xl font-mono font-bold text-foreground mb-2">
+                Unlock Full Access
+              </h2>
+              <p className="text-sm text-muted-foreground font-mono mb-4">
+                {error ||
+                  "Complete a one-time payment to unlock 5 repository scans."}
+              </p>
+            </div>
+
+            <div className="glass-card border border-primary/20 p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-foreground">
+                  One-time Payment
+                </span>
+                <span className="font-mono font-bold text-primary text-xl">
+                  $14.99
+                </span>
+              </div>
+              <div className="border-t border-primary/10 pt-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-mono text-muted-foreground">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <span>5 repository scans included</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm font-mono text-muted-foreground">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <span>Secure payment via Dodo Payments</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm font-mono text-muted-foreground">
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <span>No recurring charges</span>
+                </div>
+              </div>
+            </div>
+
+            {paymentError && (
+              <div className="glass-card border border-destructive/30 p-4 bg-destructive/5">
+                <p className="text-sm font-mono text-destructive">
+                  {paymentError}
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowPaywall(false)}
+                className="flex-1 font-mono"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateCheckout}
+                disabled={isCreatingCheckout}
+                className="flex-1 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold font-mono gap-2"
+              >
+                {isCreatingCheckout ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    <span>Pay $14.99</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <p className="text-xs text-center font-mono text-muted-foreground">
+              You&apos;ll be redirected to Dodo Payments secure checkout
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Error State */}
-      {error && (
+      {error && !showPaywall && (
         <div className="glass-card border border-destructive/30 p-6 bg-destructive/5">
           <div className="flex items-start gap-3">
             <Terminal className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />

@@ -171,18 +171,31 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Check if user has paid (required for first-time use)
+      if (!usage?.has_paid) {
+        return NextResponse.json(
+          {
+            error: "PAYMENT_REQUIRED",
+            message:
+              "Please complete the one-time $14.99 payment to unlock 5 scans.",
+            requiresPayment: true,
+          },
+          { status: 402 } // 402 Payment Required
+        );
+      }
+
       // Check if limit exceeded
       if (usage && usage.scans_used >= usage.scans_limit) {
-        const resetDate = new Date(usage.period_end).toLocaleDateString();
         return NextResponse.json(
           {
             error: "USAGE_LIMIT_REACHED",
-            message: `You've used all ${usage.scans_limit} scans for this period. Limit resets on ${resetDate}.`,
+            message: `You've used all ${usage.scans_limit} scans. Pay $14.99 to unlock 5 more scans.`,
             usage: {
               used: usage.scans_used,
               limit: usage.scans_limit,
               resetDate: usage.period_end,
             },
+            requiresPayment: true,
           },
           { status: 429 }
         );

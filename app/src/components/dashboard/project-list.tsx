@@ -22,6 +22,8 @@ import { ConnectGitHubButton } from "./connect-github-button";
 const languageColors: Record<string, string> = {
   TypeScript: "bg-blue-500",
   JavaScript: "bg-yellow-500",
+  TSX: "bg-blue-400",
+  JSX: "bg-yellow-400",
   Python: "bg-green-500",
   Java: "bg-orange-500",
   Go: "bg-cyan-500",
@@ -33,6 +35,22 @@ const languageColors: Record<string, string> = {
   C: "bg-gray-500",
   Swift: "bg-orange-400",
   Kotlin: "bg-purple-400",
+  HTML: "bg-orange-300",
+  CSS: "bg-blue-300",
+  SCSS: "bg-pink-400",
+  "Objective-C": "bg-slate-400",
+  Shell: "bg-emerald-600",
+  PowerShell: "bg-sky-600",
+  Dockerfile: "bg-sky-400",
+  Makefile: "bg-zinc-500",
+  Vue: "bg-emerald-500",
+  Svelte: "bg-orange-500",
+  Solidity: "bg-indigo-500",
+  Elixir: "bg-fuchsia-500",
+  Haskell: "bg-violet-500",
+  Scala: "bg-red-600",
+  Dart: "bg-sky-500",
+  R: "bg-cyan-600",
   default: "bg-primary",
 };
 
@@ -153,16 +171,12 @@ function RepoRow({ repo, index }: { repo: GitHubRepo; index: number }) {
 
       {/* Language */}
       <td className="px-6 py-4">
-        {repo.language ? (
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${languageColor}`} />
-            <span className="font-mono text-sm text-muted-foreground">
-              {repo.language}
-            </span>
-          </div>
-        ) : (
-          <span className="font-mono text-sm text-muted-foreground/50">—</span>
-        )}
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${languageColor}`} />
+          <span className="font-mono text-sm text-muted-foreground">
+            {repo.language || "Unknown"}
+          </span>
+        </div>
       </td>
 
       {/* Description */}

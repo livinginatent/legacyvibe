@@ -6,7 +6,7 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
     {
       cookies: {
         getAll() {
@@ -29,9 +29,16 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // PROTECT ROUTE: If no user and trying to access dashboard, redirect to login
-  if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // PROTECT ROUTES: If no user and trying to access anything except home/auth, redirect to home
+  if (!user) {
+    const path = request.nextUrl.pathname;
+
+    const isPublicRoute =
+      path === "/" || path.startsWith("/auth") || path.startsWith("/login");
+
+    if (!isPublicRoute) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
   }
 
   return supabaseResponse;

@@ -9,8 +9,8 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       <Hero />
       <ProblemSection />
-      <HowItWorks />
-      <BentoFeatures />
+{/*       <HowItWorks />
+ */}      <BentoFeatures />
       <FinalCTA />
     </div>
   );

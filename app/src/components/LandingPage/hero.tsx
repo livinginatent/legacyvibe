@@ -4,7 +4,7 @@ import HeroVisual from "./hero-visual";
 
 const Hero = () => {
   return (
-    <section className="relative min-h-screen pt-24 pb-16 overflow-hidden">
+    <section className="relative min-h-screen pt-24 pb-8 overflow-hidden">
       {/* Background effects */}
       <div className="absolute inset-0 gradient-hero-bg" />
       <div className="absolute inset-0 grid-pattern opacity-50" />
@@ -60,7 +60,7 @@ const Hero = () => {
       </div>
 
       {/* Bottom gradient fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+      
     </section>
   );
 };

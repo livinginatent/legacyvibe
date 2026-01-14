@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
       periodEnd: usage.period_end,
       daysUntilReset,
       lastResetAt: usage.last_reset_at,
+      hasPaid: usage.has_paid || false,
+      paymentStatus: usage.payment_status || null,
     });
   } catch (error) {
     console.error("Usage API error:", error);
