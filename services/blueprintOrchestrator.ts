@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Blueprint Orchestrator - Extracts business logic structure from repositories
  */
