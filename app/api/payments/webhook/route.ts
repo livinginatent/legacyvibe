@@ -230,7 +230,6 @@ async function grantScans(userId: string, paymentId?: string, amount?: number) {
         has_paid: true,
         payment_id: paymentId,
         payment_date: new Date().toISOString(),
-        payment_amount: amount,
         payment_status: "succeeded",
         scans_used: 0,
         scans_limit: 5,
