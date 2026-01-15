@@ -42,7 +42,9 @@ type DodoWebhookPayload = {
 };
 
 export async function POST(request: Request) {
-  console.log("[Dodo Webhook] Received webhook request");
+  console.log(
+    "[Dodo Webhook] Received webhook request at /api/payments/webhook"
+  );
 
   let body: string;
   try {
@@ -83,6 +85,7 @@ export async function POST(request: Request) {
   }
 
   // Verify webhook signature using standardwebhooks
+  console.log("[Dodo Webhook] Initializing Webhook verifier");
   const webhook = new Webhook(webhookSecret);
 
   let payload: DodoWebhookPayload;
@@ -119,8 +122,24 @@ export async function POST(request: Request) {
 
   // Determine event type (handle variations)
   const eventType = payload.type || payload.event || "unknown";
-  console.log(`[Dodo Webhook] Event type: ${eventType}`);
-  console.log("[Dodo Webhook] Full payload:", JSON.stringify(payload, null, 2));
+  console.log(`[Dodo Webhook] Determined event type: ${eventType}`);
+  console.log(
+    "[Dodo Webhook] Payload summary:",
+    JSON.stringify(
+      {
+        type: payload.type,
+        event: payload.event,
+        status: payload.status,
+        dataStatus: payload.data?.status,
+        payment_id:
+          payload.payment_id || payload.data?.payment_id || payload.data?.id,
+        customerEmail: payload.data?.customer?.email || payload.customer?.email,
+        metadata: payload.data?.metadata || payload.metadata,
+      },
+      null,
+      2
+    )
+  );
 
   try {
     // Handle payment.succeeded or similar events
@@ -132,7 +151,7 @@ export async function POST(request: Request) {
       payload.data?.status === "succeeded" ||
       payload.status === "succeeded"
     ) {
-      console.log("[Dodo Webhook] Processing payment success event");
+      console.log("[Dodo Webhook] Routing to handlePaymentSucceeded");
       await handlePaymentSucceeded(payload);
     } else if (
       eventType === "payment.failed" ||
@@ -140,10 +159,12 @@ export async function POST(request: Request) {
       payload.data?.status === "failed" ||
       payload.status === "failed"
     ) {
-      console.log("[Dodo Webhook] Processing payment failed event");
+      console.log("[Dodo Webhook] Routing to handlePaymentFailed");
       await handlePaymentFailed(payload);
     } else {
-      console.log(`[Dodo Webhook] Unhandled event type: ${eventType}`);
+      console.log(
+        `[Dodo Webhook] Unhandled event type or status. eventType=${eventType}, status=${payload.status}, data.status=${payload.data?.status}`
+      );
     }
 
     return NextResponse.json({ received: true });
@@ -164,7 +185,6 @@ async function handlePaymentSucceeded(payload: DodoWebhookPayload) {
   const data = payload.data;
 
   const paymentId = data?.payment_id || data?.id || payload.payment_id;
-  const amount = data?.amount || data?.total_amount || 1499;
 
   // Try to get user ID from metadata (check multiple locations)
   const metadata = data?.metadata || payload.metadata;
@@ -172,8 +192,9 @@ async function handlePaymentSucceeded(payload: DodoWebhookPayload) {
 
   console.log("[Dodo Webhook] Payment data extracted:");
   console.log("  paymentId:", paymentId);
-  console.log("  amount:", amount);
   console.log("  userId from metadata:", userId);
+  console.log("  customer (data):", JSON.stringify(data?.customer));
+  console.log("  customer (top-level):", JSON.stringify(payload.customer));
   console.log("  metadata:", JSON.stringify(metadata));
 
   if (!userId) {
@@ -184,7 +205,9 @@ async function handlePaymentSucceeded(payload: DodoWebhookPayload) {
     const email = customer?.email;
 
     if (email) {
-      console.log(`[Dodo Webhook] Attempting to find user by email: ${email}`);
+      console.log(
+        `[Dodo Webhook] Attempting to find user by email fallback: ${email}`
+      );
       try {
         const supabase = getSupabaseAdmin();
         const { data: usersData, error } =
@@ -195,13 +218,21 @@ async function handlePaymentSucceeded(payload: DodoWebhookPayload) {
           return;
         }
 
+        console.log(
+          `[Dodo Webhook] Total users returned from admin.listUsers: ${usersData?.users?.length}`
+        );
+
         const user = usersData?.users?.find((u) => u.email === email);
         if (user) {
-          console.log(`[Dodo Webhook] Found user by email: ${user.id}`);
-          await grantScans(user.id, paymentId, amount);
+          console.log(
+            `[Dodo Webhook] Found user by email fallback: ${user.id}`
+          );
+          await grantScans(user.id, paymentId);
           return;
         } else {
-          console.error(`[Dodo Webhook] No user found with email: ${email}`);
+          console.error(
+            `[Dodo Webhook] No user found with email fallback: ${email}`
+          );
         }
       } catch (err) {
         console.error("[Dodo Webhook] Error finding user by email:", err);
@@ -212,44 +243,54 @@ async function handlePaymentSucceeded(payload: DodoWebhookPayload) {
     return;
   }
 
-  await grantScans(userId, paymentId, amount);
+  await grantScans(userId, paymentId);
 }
 
 /**
  * Grant scans to user and update payment status
  */
-async function grantScans(userId: string, paymentId?: string, amount?: number) {
-  console.log(`[Dodo Webhook] Granting scans to user: ${userId}`);
+async function grantScans(userId: string, paymentId?: string) {
+  console.log(
+    `[Dodo Webhook] Granting scans to user: ${userId} (paymentId=${paymentId})`
+  );
 
   try {
     const supabase = getSupabaseAdmin();
 
-    const { error } = await supabase.from("user_usage").upsert(
-      {
-        user_id: userId,
-        has_paid: true,
-        payment_id: paymentId,
-        payment_date: new Date().toISOString(),
-        payment_status: "succeeded",
-        scans_used: 0,
-        scans_limit: 5,
-        period_start: new Date().toISOString(),
-        period_end: new Date(
-          Date.now() + 30 * 24 * 60 * 60 * 1000
-        ).toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "user_id",
-      }
+    const payload = {
+      user_id: userId,
+      has_paid: true,
+      payment_id: paymentId,
+      payment_date: new Date().toISOString(),
+      payment_status: "succeeded",
+      scans_used: 0,
+      scans_limit: 5,
+      period_start: new Date().toISOString(),
+      period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    console.log(
+      "[Dodo Webhook] Upserting into user_usage with payload:",
+      JSON.stringify(payload)
     );
+
+    const { data, error } = await supabase
+      .from("user_usage")
+      .upsert(payload, {
+        onConflict: "user_id",
+      })
+      .select();
 
     if (error) {
       console.error("[Dodo Webhook] Database error granting scans:", error);
       throw error;
     }
 
-    console.log(`[Dodo Webhook] SUCCESS: Granted 5 scans to user ${userId}`);
+    console.log(
+      `[Dodo Webhook] SUCCESS: Granted 5 scans to user ${userId}. DB response:`,
+      JSON.stringify(data)
+    );
   } catch (err) {
     console.error("[Dodo Webhook] Failed to grant scans:", err);
     throw err;
