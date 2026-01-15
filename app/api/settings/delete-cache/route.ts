@@ -3,13 +3,13 @@
  * Removes all cached analyses, onboarding paths, impact analyses, and documentation for the user
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/app/src/utils/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
     const cookieStore = cookies();
     const supabase = createClient(cookieStore);
@@ -21,10 +21,7 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     console.log(`[Delete Cache] Deleting all cached data for user: ${user.id}`);
@@ -33,13 +30,13 @@ export async function DELETE(request: NextRequest) {
     const deletions = await Promise.allSettled([
       // Delete analyses (blueprint cache)
       supabase.from("analyses").delete().eq("user_id", user.id),
-      
+
       // Delete onboarding paths
       supabase.from("onboarding_paths").delete().eq("user_id", user.id),
-      
+
       // Delete impact analyses
       supabase.from("impact_analyses").delete().eq("user_id", user.id),
-      
+
       // Delete generated documentation
       supabase.from("generated_documentation").delete().eq("user_id", user.id),
     ]);
@@ -67,14 +64,19 @@ export async function DELETE(request: NextRequest) {
 
     // Get counts for logging
     const counts = deletions.map((result) => {
-      if (result.status === "fulfilled" && result.value.data) {
-        return result.value.data.length || 0;
+      if (result.status === "fulfilled") {
+        const data = (result.value as { data: unknown[] | null }).data;
+        return Array.isArray(data) ? data.length : 0;
       }
       return 0;
     });
 
-    console.log(`[Delete Cache] Successfully deleted cached data for user ${user.id}`);
-    console.log(`[Delete Cache] Counts: analyses=${counts[0]}, onboarding=${counts[1]}, impact=${counts[2]}, docs=${counts[3]}`);
+    console.log(
+      `[Delete Cache] Successfully deleted cached data for user ${user.id}`
+    );
+    console.log(
+      `[Delete Cache] Counts: analyses=${counts[0]}, onboarding=${counts[1]}, impact=${counts[2]}, docs=${counts[3]}`
+    );
 
     return NextResponse.json({
       success: true,
