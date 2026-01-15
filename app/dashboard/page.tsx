@@ -24,10 +24,15 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ installation_id?: string }>;
+  searchParams: Promise<{ installation_id?: string; page?: string }>;
 }) {
   // Await searchParams (required in Next.js 16+)
   const params = await searchParams;
+
+  const page =
+    params.page && !isNaN(Number(params.page)) && Number(params.page) > 0
+      ? Number(params.page)
+      : 1;
 
   // Handle GitHub App installation callback
   if (params.installation_id) {
@@ -40,7 +45,7 @@ export default async function DashboardPage({
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex mt-12 h-screen bg-background overflow-hidden">
       {/* Sidebar */}
       <DashboardSidebar />
 
@@ -55,11 +60,6 @@ export default async function DashboardPage({
             <p className="text-muted-foreground font-mono text-sm">
               Monitor and manage your legacy code projects
             </p>
-          </div>
-
-          {/* New Project Card */}
-          <div className="mb-8">
-            <NewProjectCard />
           </div>
 
           {/* GitHub Repositories */}
@@ -77,7 +77,7 @@ export default async function DashboardPage({
                 </div>
               }
             >
-              <ProjectList />
+              <ProjectList page={page} />
             </Suspense>
           </div>
         </div>

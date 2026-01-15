@@ -1,4 +1,4 @@
-# GitHub OAuth Setup for LegacyVibe
+# GitHub OAuth Setup for Cadracode
 
 ## Environment Variables Required
 
@@ -22,7 +22,7 @@ The `signInWithGithub` action requests these scopes:
 
 ### ✅ `repo`
 - **Purpose:** Full control of private repositories
-- **Why Needed:** Allows LegacyVibe to:
+- **Why Needed:** Allows Cadracode to:
   - Read repository structure and files
   - Analyze codebase for documentation
   - Generate blueprints and technical debt reports
@@ -30,7 +30,7 @@ The `signInWithGithub` action requests these scopes:
 
 ### ✅ `read:user`
 - **Purpose:** Read user profile information
-- **Why Needed:** Allows LegacyVibe to:
+- **Why Needed:** Allows Cadracode to:
   - Get user's GitHub username and email
   - Display user information in the dashboard
   - Associate scanned repositories with the user
@@ -90,7 +90,7 @@ https://yourdomain.com/auth/callback
 1. Go to GitHub: **Settings → Developer settings → OAuth Apps**
 2. Click **New OAuth App**
 3. Fill in:
-   - **Application name:** LegacyVibe
+   - **Application name:** Cadracode
    - **Homepage URL:** `http://localhost:3000` (or your domain)
    - **Authorization callback URL:** `https://your-project.supabase.co/auth/v1/callback`
 4. Copy **Client ID** and **Client Secret**
@@ -102,7 +102,7 @@ https://yourdomain.com/auth/callback
 
 1. Start your app: `npm run dev`
 2. Click "Continue with GitHub" on login page
-3. Authorize LegacyVibe on GitHub
+3. Authorize Cadracode on GitHub
 4. Should redirect to: `http://localhost:3000/auth/callback`
 5. Callback exchanges code for session
 6. Redirects to: `/dashboard`
@@ -137,7 +137,7 @@ After authentication, check the session token includes:
 
 ## Why These Scopes Are Crucial
 
-LegacyVibe requires:
+Cadracode requires:
 
 1. **`repo` scope** to:
    - Access repository files and structure
@@ -150,7 +150,7 @@ LegacyVibe requires:
    - Associate projects with users
    - Show repository ownership
 
-**Without these scopes, LegacyVibe cannot function properly.**
+**Without these scopes, Cadracode cannot function properly.**
 
 ## Production Deployment
 
@@ -170,4 +170,4 @@ When deploying to production:
 
 ✅ **Setup Complete!**
 
-Your GitHub OAuth is now configured with the correct scopes for LegacyVibe to analyze repositories.
+Your GitHub OAuth is now configured with the correct scopes for Cadracode to analyze repositories.

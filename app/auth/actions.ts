@@ -199,11 +199,11 @@ export async function signInWithPassword(email: string, password: string) {
 
 /**
  * Initiate GitHub App Installation from Dashboard.
- * Redirects user to install the LegacyVibe GitHub App, allowing them to select repositories.
+ * Redirects user to install the Cadracode GitHub App, allowing them to select repositories.
  * GitHub will redirect back to /dashboard with installation_id in the query parameters.
  *
  * This uses the GitHub App flow instead of OAuth, providing more granular repository access.
- * Users can select specific repositories to grant LegacyVibe access to.
+ * Users can select specific repositories to grant Cadracode access to.
  *
  * Note: This is used from the dashboard AFTER the user has logged in via email/password.
  */
@@ -212,7 +212,7 @@ export async function connectGitHub() {
     // Redirect to GitHub App installation page
     // User will be prompted to install the app and select repositories
     // GitHub will redirect back to the Setup URL (/dashboard) with installation_id
-    redirect("https://github.com/apps/legacyvibe/installations/new");
+    redirect("https://github.com/apps/cadracode/installations/new");
   } catch (error) {
     // Handle redirect errors (redirect throws an error in Next.js)
     if (error instanceof Error && error.message === "NEXT_REDIRECT") {

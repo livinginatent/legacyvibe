@@ -3,9 +3,9 @@
  * Handles all GitHub API interactions using the GitHub App installation flow.
  * Uses Octokit's App class for type-safe GitHub API access as a GitHub App.
  *
- * This service authenticates as the LegacyVibe GitHub App and uses the
+ * This service authenticates as the Cadracode GitHub App and uses the
  * installation_id to fetch only repositories that the user has explicitly
- * granted LegacyVibe access to.
+ * granted Cadracode access to.
  *
  * Security: Never logs access tokens or private keys (follows api-security rule).
  */
@@ -37,7 +37,7 @@ export interface GitHubInstallation {
 
 /**
  * Initializes the GitHub App instance using environment variables.
- * This app instance is used to authenticate as the LegacyVibe GitHub App.
+ * This app instance is used to authenticate as the Cadracode GitHub App.
  *
  * @returns Configured App instance
  * @throws Error if required environment variables are missing
@@ -60,7 +60,7 @@ function getGitHubApp(): App {
 
 /**
  * Gets the GitHub App installation_id for the current user.
- * This ID is obtained when the user installs the LegacyVibe GitHub App.
+ * This ID is obtained when the user installs the Cadracode GitHub App.
  *
  * The installation_id is stored in the user's metadata after successful installation.
  *
@@ -102,11 +102,11 @@ async function getInstallationId(): Promise<string | null> {
 export type GetReposResult = GitHubRepo[] | { error: string };
 
 /**
- * Fetches repositories that the user has granted LegacyVibe access to via GitHub App installation.
+ * Fetches repositories that the user has granted Cadracode access to via GitHub App installation.
  * Only returns repositories explicitly authorized during the GitHub App installation flow.
  *
- * Authenticates as the LegacyVibe GitHub App using the installation_id to ensure
- * users have full control over which repositories LegacyVibe can analyze.
+ * Authenticates as the Cadracode GitHub App using the installation_id to ensure
+ * users have full control over which repositories Cadracode can analyze.
  *
  * @returns Array of repository objects or error object
  */
@@ -152,19 +152,22 @@ export async function getUserRepos(): Promise<GetReposResult> {
     // Check if the error is a 404 (installation not found / app uninstalled)
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    const isNotFound = 
-      errorMessage.includes("Not Found") || 
+    const isNotFound =
+      errorMessage.includes("Not Found") ||
       errorMessage.includes("404") ||
       (error as any)?.status === 404;
 
     if (isNotFound) {
-      console.log("GitHub App installation not found - clearing stored installation_id");
-      
+      console.log(
+        "GitHub App installation not found - clearing stored installation_id"
+      );
+
       // Clear the invalid installation_id from user metadata
       await clearInstallationId();
 
       return {
-        error: "GitHub App is not connected. Please connect the GitHub App to access your repositories.",
+        error:
+          "GitHub App is not connected. Please connect the GitHub App to access your repositories.",
       };
     }
 

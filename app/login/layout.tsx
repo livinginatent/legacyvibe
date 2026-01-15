@@ -6,8 +6,8 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Login | LegacyVibe",
-  description: "Sign in to your LegacyVibe account",
+  title: "Login | Cadracode",
+  description: "Sign in to your Cadracode account",
 };
 
 export default function LoginLayout({

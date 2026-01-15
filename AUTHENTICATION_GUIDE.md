@@ -1,8 +1,8 @@
-# LegacyVibe Authentication - Complete Guide
+# Cadracode Authentication - Complete Guide
 
 ## 🎉 What's Been Implemented
 
-This guide covers the **production-ready** authentication system for LegacyVibe, complete with Zod validation, password reset flows, and security best practices.
+This guide covers the **production-ready** authentication system for Cadracode, complete with Zod validation, password reset flows, and security best practices.
 
 ---
 

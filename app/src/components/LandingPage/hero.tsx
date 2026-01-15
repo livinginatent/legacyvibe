@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 import { Button } from "@/app/src/components/ui/button";
 import HeroVisual from "./hero-visual";
+import Link from "next/link";
 
 const Hero = () => {
   return (
@@ -19,25 +20,25 @@ const Hero = () => {
           <div className="space-y-8">
             <div className="space-y-6">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-foreground animate-fade-in-up">
-                Understand Your{" "}
+                Scan Your{" "}
                 <span className="text-primary text-glow">
-                  Codebase in Minutes
+                  Vibe Code in Minutes
                 </span>
               </h1>
 
               <p className="font-mono text-lg md:text-xl text-muted-foreground leading-relaxed animate-fade-in-up animation-delay-200">
-                AI-powered architecture analysis. Visualize business logic, track technical debt, 
+                AI-powered architecture analysis of your codebase. Visualize business logic, track technical debt, 
                 analyze impact, and onboard new developers—all from one dashboard.
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 animate-fade-in-up animation-delay-400">
+              <Link href="/login">
               <Button variant="hero" size="lg">
-                Start Free Analysis
+                Start Analyzing Your Codebase
               </Button>
-              <Button variant="outline" size="lg" className="font-mono">
-                View Pricing
-              </Button>
+              </Link>
+            
             </div>
 
             <div className="flex items-center gap-6 animate-fade-in-up animation-delay-600">
@@ -47,7 +48,7 @@ const Hero = () => {
               </p>
               <div className="h-4 w-px bg-border" />
               <p className="font-mono text-sm text-muted-foreground/70">
-                <span className="text-primary/80">5 scans</span> per month
+                <span className="text-primary/80">5 scans</span> - Visual Architecture Map, Impact Analysis, Onboarding Paths, Documentation, and Debt Tracking
               </p>
             </div>
           </div>

@@ -1,6 +1,7 @@
 # Smart Documentation Generator 📝
 
 ## Overview
+
 The Smart Documentation Generator automatically creates beautiful, comprehensive architecture documentation from your blueprint analysis. One click generates professional markdown docs perfect for sharing with external developers, new team members, or stakeholders.
 
 ## Features Implemented
@@ -8,6 +9,7 @@ The Smart Documentation Generator automatically creates beautiful, comprehensive
 ### 🎯 Core Functionality
 
 #### 1. **One-Click Export**
+
 - Blue "Export Docs" button in dashboard header
 - Generates complete documentation in seconds
 - Downloads as ready-to-use Markdown file
@@ -26,14 +28,18 @@ The Smart Documentation Generator automatically creates beautiful, comprehensive
 8. **Footer** - Additional resources and attribution
 
 #### 3. **Database Caching**
+
 Table: `generated_documentation`
+
 - Stores complete markdown/MDX content
 - Caches per repository + format
 - Includes metadata (file count, feature count, line count)
 - RLS enabled for security
 
 #### 4. **Auto-Updates**
+
 When you click "Force Rescan" and regenerate the blueprint:
+
 - Documentation cache remains valid
 - Click "Export Docs" again to get updated version
 - New documentation reflects architectural changes
@@ -48,7 +54,7 @@ When you click "Force Rescan" and regenerate the blueprint:
 
 > **Repository**: owner/my-repo  
 > **Generated**: 1/13/2026, 12:00:00 PM  
-> **Generator**: LegacyVibe Blueprint Orchestrator
+> **Generator**: Cadracode Blueprint Orchestrator
 
 ---
 
@@ -57,11 +63,13 @@ When you click "Force Rescan" and regenerate the blueprint:
 This repository contains **6 major features** organized across **18 critical files**.
 
 ### Quick Stats
+
 - **Features**: 6
 - **Connections**: 8
 - **Critical Files**: 18
 
 ### Risk Assessment
+
 - 🔴 **The User Gateway** - High risk
 - ✅ No other high-risk features detected
 
@@ -72,13 +80,15 @@ This repository contains **6 major features** organized across **18 critical fil
 The system is organized into 6 interconnected features...
 
 ### Feature Map
+
 1. The User Gateway [High Risk]
    └─ Handles all authentication and user management
 2. The Dashboard [Low Risk]
    └─ Main UI for users to interact with features
-...
+   ...
 
 ### System Flow
+
 - **The User Gateway** → **The Dashboard**  
   _Provides authenticated user session_
 
@@ -93,6 +103,7 @@ The system is organized into 6 interconnected features...
 **Vibe**: 🔒 stable
 
 #### Critical Files
+
 - `app/auth/actions.ts`
 - `app/auth/callback/route.ts`
 - `middleware.ts`
@@ -121,6 +132,7 @@ The system is organized into 6 interconnected features...
 8. **Footer** - Links and resources
 
 ### Try it out:
+
 1. Run the migration: `supabase/migrations/005_create_documentation_table.sql`
 2. Analyze a repository
 3. Click the blue **"Export Docs"** button

@@ -47,7 +47,7 @@ const BentoFeatures = () => {
             {/* Mockup - Blueprint Graph */}
             <div className="flex-1 bg-background/50 rounded-lg p-6 border border-border overflow-hidden">
               <div className="font-mono text-xs mb-4 text-muted-foreground">
-                ecommerce-app/legacyvibe
+                ecommerce-app/cadracode
               </div>
               
               {/* Mock nodes */}

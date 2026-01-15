@@ -18,7 +18,7 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        // LegacyVibe custom variants
+        // Cadracode custom variants
         hero: "bg-primary text-primary-foreground font-semibold text-base px-8 py-6 rounded-lg shadow-[0_0_30px_hsl(186_100%_50%/0.4)] hover:shadow-[0_0_50px_hsl(186_100%_50%/0.6)] hover:scale-105 transition-all duration-300",
         "glow-outline":
           "border-2 border-primary/50 bg-transparent text-primary hover:bg-primary/10 hover:border-primary shadow-[0_0_20px_hsl(186_100%_50%/0.2)] hover:shadow-[0_0_30px_hsl(186_100%_50%/0.4)] transition-all duration-300",

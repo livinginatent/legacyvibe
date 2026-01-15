@@ -38,36 +38,10 @@ const Navbar = () => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="relative">
-              <Cpu className="w-7 h-7 text-primary" />
-              <div className="absolute inset-0 blur-md bg-primary/30 rounded-full" />
-            </div>
             <span className="text-xl font-bold text-foreground">
-              Legacy<span className="text-primary">Vibe</span>
+              Cadra<span className="text-primary">code</span>
             </span>
           </Link>
-
-          {/* Navigation Links */}
-          <div className="hidden md:flex items-center gap-8">
-            <a
-              href="#features"
-              className="text-muted-foreground hover:text-primary transition-colors duration-300 text-sm font-medium"
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-muted-foreground hover:text-primary transition-colors duration-300 text-sm font-medium"
-            >
-              How it Works
-            </a>
-            <a
-              href="#pricing"
-              className="text-muted-foreground hover:text-primary transition-colors duration-300 text-sm font-medium"
-            >
-              Pricing
-            </a>
-          </div>
 
           {/* Auth Section */}
           {!isLoading && (

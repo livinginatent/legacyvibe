@@ -25,5 +25,5 @@ export function getDodo(): DodoPayments {
   return _dodo;
 }
 
-// Product ID for the LegacyVibe one-time payment
-export const LEGACYVIBE_PRODUCT_ID = process.env.DODO_PAYMENTS_PRODUCT_ID || "";
+// Product ID for the Cadracode one-time payment
+export const CADRACODE_PRODUCT_ID = process.env.DODO_PAYMENTS_PRODUCT_ID || "";

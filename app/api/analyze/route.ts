@@ -610,7 +610,7 @@ async function analyzeChunk(
     }
   }
 
-  const systemPrompt = `You are the "LegacyVibe Architect" analyzing a SECTION of a larger codebase.
+  const systemPrompt = `You are the "Cadracode Architect" analyzing a SECTION of a larger codebase.
 
 Your task: Extract business features from THIS CHUNK ONLY.
 
@@ -736,7 +736,7 @@ async function synthesizeBlueprint(
   const edgesStr = JSON.stringify(allEdges, null, 2);
   const insightsStr = allInsights.join("\n- ");
 
-  const systemPrompt = `You are the "LegacyVibe Architect" creating a UNIFIED blueprint from chunk analyses.
+  const systemPrompt = `You are the "Cadracode Architect" creating a UNIFIED blueprint from chunk analyses.
 
 Your task: Merge, deduplicate, and refine the partial analyses into ONE coherent system view.
 
@@ -823,7 +823,7 @@ async function fastAnalysis(
   fileTreeStr: string,
   manifestsStr: string
 ): Promise<BlueprintGraph> {
-  const systemPrompt = `You are the "LegacyVibe Architect" - a repo interpreter for developers who need to ship fast and understand intuitively.
+  const systemPrompt = `You are the "Cadracode Architect" - a repo interpreter for developers who need to ship fast and understand intuitively.
 
 INPUT: Filtered file tree + manifest contents
 OUTPUT: JSON Business-Logic Graph
@@ -926,7 +926,7 @@ async function fastAnalysisWithProgress(
 ): Promise<BlueprintGraph> {
   sendProgress("Sending repository structure to AI...", "ai-analysis");
 
-  const systemPrompt = `You are the "LegacyVibe Architect" - a repo interpreter for developers who need to ship fast and understand intuitively.
+  const systemPrompt = `You are the "Cadracode Architect" - a repo interpreter for developers who need to ship fast and understand intuitively.
 
 INPUT: Filtered file tree + manifest contents
 OUTPUT: JSON Business-Logic Graph

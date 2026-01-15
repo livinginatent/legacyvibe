@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unescaped-entities */
 /**
- * Login Page - Authentication interface for LegacyVibe.
+ * Login Page - Authentication interface for Cadracode.
  * Provides email/password authentication.
  * Follows tech-vibe-ui aesthetic with glassmorphism and cyan accents.
  * Includes loading states and email verification notifications.

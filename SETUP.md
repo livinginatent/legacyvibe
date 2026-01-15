@@ -1,4 +1,4 @@
-# LegacyVibe Setup Guide
+# Cadracode Setup Guide
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@
 
    - Go to [GitHub Apps](https://github.com/settings/apps/new)
    - Create a new GitHub App with:
-     - **Name**: LegacyVibe (or your preferred name)
+     - **Name**: Cadracode (or your preferred name)
      - **Homepage URL**: `http://localhost:3000`
      - **Callback URL**: `http://localhost:3000/auth/callback`
      - **Setup URL**: `http://localhost:3000/dashboard`

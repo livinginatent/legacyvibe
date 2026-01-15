@@ -7,7 +7,7 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dashboard | LegacyVibe",
+  title: "Dashboard | Cadracode",
   description: "Manage and monitor your legacy code projects",
 };
 

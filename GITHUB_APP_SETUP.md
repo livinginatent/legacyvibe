@@ -1,6 +1,6 @@
 # GitHub App Setup Guide
 
-This guide will help you set up the LegacyVibe GitHub App for repository analysis.
+This guide will help you set up the Cadracode GitHub App for repository analysis.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ This guide will help you set up the LegacyVibe GitHub App for repository analysi
 
 1. Go to https://github.com/settings/apps/new
 2. Fill in the basic information:
-   - **GitHub App name**: `LegacyVibe` (or `LegacyVibe-Dev` for local testing)
+   - **GitHub App name**: `Cadracode` (or `Cadracode-Dev` for local testing)
    - **Homepage URL**: `http://localhost:3000` (or your production URL)
    - **Setup URL**: `http://localhost:3000/dashboard`
    - **Callback URL**: Leave this blank (we're not using OAuth callbacks)
@@ -21,6 +21,7 @@ This guide will help you set up the LegacyVibe GitHub App for repository analysi
 ### 2. Configure Permissions
 
 Under "Repository permissions":
+
 - **Contents**: Read-only
 - **Metadata**: Read-only (automatically selected)
 
@@ -78,7 +79,8 @@ GITHUB_PRIVATE_KEY_BASE64="LS0tLS1CRUdJTi..."
 
 **Important**: The private key must be formatted correctly:
 
-1. **Keep the BEGIN and END lines**: 
+1. **Keep the BEGIN and END lines**:
+
    ```
    -----BEGIN RSA PRIVATE KEY-----
    ...
@@ -86,6 +88,7 @@ GITHUB_PRIVATE_KEY_BASE64="LS0tLS1CRUdJTi..."
    ```
 
 2. **For inline format**, replace all newlines with `\n`:
+
    ```
    "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----"
    ```
@@ -95,6 +98,7 @@ GITHUB_PRIVATE_KEY_BASE64="LS0tLS1CRUdJTi..."
 ## Testing the Setup
 
 1. Start your development server:
+
    ```bash
    npm run dev
    ```
@@ -103,7 +107,7 @@ GITHUB_PRIVATE_KEY_BASE64="LS0tLS1CRUdJTi..."
 
 3. Click **"Continue with GitHub"** on the login page
 
-4. You should be redirected to GitHub to install the LegacyVibe app
+4. You should be redirected to GitHub to install the Cadracode app
 
 5. Select the repositories you want to grant access to
 
@@ -132,7 +136,7 @@ GITHUB_PRIVATE_KEY_BASE64="LS0tLS1CRUdJTi..."
 
 ### Repository permissions issues
 
-- Go to GitHub Settings > Applications > LegacyVibe
+- Go to GitHub Settings > Applications > Cadracode
 - Click "Configure"
 - Verify the correct repositories are selected
 
@@ -148,12 +152,14 @@ When deploying to production:
 ## Security Best Practices
 
 ✅ **DO:**
+
 - Store private keys in environment variables
 - Use server-side only code for GitHub API calls
 - Keep private keys in `.env.local` (gitignored)
 - Rotate private keys periodically
 
 ❌ **DON'T:**
+
 - Commit private keys to version control
 - Log private keys or access tokens
 - Expose private keys in client-side code

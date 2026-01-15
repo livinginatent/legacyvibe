@@ -73,7 +73,7 @@ function EmptyState() {
           Connect Your Repositories
         </h3>
         <p className="text-sm text-muted-foreground font-mono max-w-md mb-6">
-          Install the LegacyVibe GitHub App to grant access to your repositories
+          Install the Cadracode GitHub App to grant access to your repositories
           and start analyzing your code.
         </p>
         <ConnectGitHubButton />
@@ -154,19 +154,22 @@ function RepoRow({ repo, index }: { repo: GitHubRepo; index: number }) {
     >
       {/* Repo Name */}
       <td className="px-6 py-4">
-        <div className="flex items-center gap-3">
+        <Link
+          href={`/dashboard/action/${encodeURIComponent(repo.full_name)}`}
+          className="flex items-center gap-3 group/link"
+        >
           <div className="w-8 h-8 rounded border border-primary/30 bg-primary/10 flex items-center justify-center font-mono text-primary text-xs font-bold">
             {repo.name.substring(0, 2).toUpperCase()}
           </div>
           <div className="flex flex-col">
-            <span className="font-mono text-foreground font-medium">
+            <span className="font-mono text-foreground font-medium group-hover/link:underline">
               {repo.name}
             </span>
             <span className="font-mono text-xs text-muted-foreground">
               {repo.full_name}
             </span>
           </div>
-        </div>
+        </Link>
       </td>
 
       {/* Language */}
@@ -231,7 +234,21 @@ function RepoRow({ repo, index }: { repo: GitHubRepo; index: number }) {
 /**
  * Repository table component
  */
-function RepoTable({ repos }: { repos: GitHubRepo[] }) {
+function RepoTable({
+  repos,
+  totalRepos,
+  currentPage,
+  totalPages,
+}: {
+  repos: GitHubRepo[];
+  totalRepos: number;
+  currentPage: number;
+  totalPages: number;
+}) {
+  const ITEMS_PER_PAGE = 5;
+  const start = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+  const end = Math.min(start + repos.length - 1, totalRepos);
+
   return (
     <div className="glass-card border border-primary/20">
       {/* Header */}
@@ -242,9 +259,8 @@ function RepoTable({ repos }: { repos: GitHubRepo[] }) {
               Your Repositories
             </h2>
             <p className="text-sm font-mono text-muted-foreground">
-              {repos.length}{" "}
-              {repos.length === 1 ? "repository" : "repositories"} connected via
-              GitHub
+              {totalRepos} {totalRepos === 1 ? "repository" : "repositories"}{" "}
+              connected via GitHub
             </p>
           </div>
           <ConnectGitHubButton variant="outline" />
@@ -282,20 +298,43 @@ function RepoTable({ repos }: { repos: GitHubRepo[] }) {
       <div className="p-4 border-t border-primary/10 flex items-center justify-between">
         <div className="text-sm font-mono text-muted-foreground">
           Showing{" "}
-          <span className="text-primary font-semibold">{repos.length}</span>{" "}
-          {repos.length === 1 ? "repository" : "repositories"}
+          <span className="text-primary font-semibold">
+            {totalRepos === 0 ? 0 : start}
+            {totalRepos > 0 && end !== start ? `-${end}` : ""}
+          </span>{" "}
+          of <span className="text-primary font-semibold">{totalRepos}</span>{" "}
+          {totalRepos === 1 ? "repository" : "repositories"} (Page{" "}
+          <span className="text-primary font-semibold">{currentPage}</span> of{" "}
+          <span className="text-primary font-semibold">{totalPages}</span>)
         </div>
         <div className="flex gap-2">
           <Button
             size="sm"
             variant="outline"
-            disabled
+            disabled={currentPage <= 1}
             className="border-primary/30"
+            asChild
           >
-            Previous
+            <Link href={currentPage <= 1 ? "?" : `?page=${currentPage - 1}`}>
+              Previous
+            </Link>
           </Button>
-          <Button size="sm" variant="outline" className="border-primary/50">
-            Next
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-primary/50"
+            disabled={currentPage >= totalPages}
+            asChild
+          >
+            <Link
+              href={
+                currentPage >= totalPages
+                  ? `?page=${totalPages}`
+                  : `?page=${currentPage + 1}`
+              }
+            >
+              Next
+            </Link>
           </Button>
         </div>
       </div>
@@ -307,7 +346,7 @@ function RepoTable({ repos }: { repos: GitHubRepo[] }) {
  * Main Project List Component
  * Server Component that fetches repos from GitHub and renders them in a table.
  */
-export async function ProjectList() {
+export async function ProjectList({ page = 1 }: { page?: number }) {
   // Fetch user repositories from GitHub API
   const result = await getUserRepos();
 
@@ -321,6 +360,20 @@ export async function ProjectList() {
     return <EmptyState />;
   }
 
-  // Render table with repos
-  return <RepoTable repos={result} />;
+  const ITEMS_PER_PAGE = 5;
+  const totalRepos = result.length;
+  const totalPages = Math.max(1, Math.ceil(totalRepos / ITEMS_PER_PAGE));
+  const currentPage = Math.min(Math.max(page, 1), totalPages);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedRepos = result.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // Render table with paginated repos
+  return (
+    <RepoTable
+      repos={paginatedRepos}
+      totalRepos={totalRepos}
+      currentPage={currentPage}
+      totalPages={totalPages}
+    />
+  );
 }

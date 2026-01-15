@@ -181,7 +181,7 @@ npm install dodopayments standardwebhooks
 3. Go to **Products**
 4. Click **Create Product**
 5. Set:
-   - **Name**: "LegacyVibe - 5 Scans"
+   - **Name**: "Cadracode - 5 Scans"
    - **Price**: $14.99
    - **Type**: One-time payment
 6. Copy the **Product ID** (e.g., `prod_abc123`)

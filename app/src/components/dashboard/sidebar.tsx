@@ -17,11 +17,7 @@ const navItems = [
     href: "/dashboard",
     icon: FolderGit2,
   },
-  {
-    name: "Integrations",
-    href: "/dashboard/integrations",
-    icon: Plug,
-  },
+
   {
     name: "Settings",
     href: "/dashboard/settings",
@@ -43,7 +39,7 @@ export function DashboardSidebar() {
           </div>
           <div>
             <span className="text-xl font-bold text-foreground">
-              Legacy<span className="text-primary">Vibe</span>
+              Cadra<span className="text-primary">code</span>
             </span>
             <p className="text-xs font-mono text-muted-foreground">v1.0.0</p>
           </div>

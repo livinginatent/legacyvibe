@@ -1,5 +1,6 @@
 /* eslint-disable react/no-unescaped-entities */
 import { Button } from "@/app/src/components/ui/button";
+import Link from "next/link";
 
 const FinalCTA = () => {
   return (
@@ -17,12 +18,12 @@ const FinalCTA = () => {
       <div className="container mx-auto px-6 relative z-10 text-center">
         <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
           Ready to Understand Your{" "}
-          <span className="text-primary text-glow">Codebase</span>?
+          <span className="text-primary text-glow">Vibe Code</span>?
         </h2>
 
         <p className="font-mono text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-          Get started with 5 comprehensive scans per month. Visualize architecture, 
-          track debt, analyze impact, and onboard developers.
+          Get started with 5 comprehensive scans per month. With each scan, you can visualize your architecture, 
+          track technical debt, analyze impact, and onboard developers.
         </p>
 
         {/* Pricing Card */}
@@ -52,12 +53,12 @@ const FinalCTA = () => {
           </div>
 
           <div className="pt-6 border-t border-border">
+            <Link href="/login">
             <Button variant="final-cta" className="w-full">
-              Start Free Trial
+              Start Analyzing Your Codebase
             </Button>
-            <p className="font-mono text-xs text-muted-foreground mt-4">
-              No credit card required • Cancel anytime
-            </p>
+            </Link>
+            
           </div>
         </div>
       </div>

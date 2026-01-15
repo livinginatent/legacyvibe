@@ -6,14 +6,14 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/app/src/utils/supabase/server";
-import { getDodo, LEGACYVIBE_PRODUCT_ID } from "@/lib/dodo/server";
+import { getDodo, CADRACODE_PRODUCT_ID } from "@/lib/dodo/server";
 
 export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
     // Check if product ID is configured
-    if (!LEGACYVIBE_PRODUCT_ID) {
+    if (!CADRACODE_PRODUCT_ID) {
       console.error("DODO_PAYMENTS_PRODUCT_ID is not set");
       return NextResponse.json(
         { error: "Payment system not configured" },
@@ -52,7 +52,7 @@ export async function POST() {
     // Verify environment configuration
     const isLiveMode = process.env.DODO_LIVE_MODE === "true";
     const hasApiKey = !!process.env.DODO_PAYMENTS_API_KEY;
-    const hasProductId = !!LEGACYVIBE_PRODUCT_ID;
+    const hasProductId = !!CADRACODE_PRODUCT_ID;
     const hasSiteUrl = !!process.env.NEXT_PUBLIC_SITE_URL;
 
     console.log(`[Checkout] Configuration check:`, {
@@ -60,7 +60,7 @@ export async function POST() {
       hasApiKey,
       hasProductId,
       hasSiteUrl,
-      productId: LEGACYVIBE_PRODUCT_ID,
+      productId: CADRACODE_PRODUCT_ID,
       siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
     });
 
@@ -111,7 +111,7 @@ export async function POST() {
     console.log(
       `[Checkout] Creating session for user ${user.id} (${customerEmail})`
     );
-    console.log(`[Checkout] Product ID: ${LEGACYVIBE_PRODUCT_ID}`);
+    console.log(`[Checkout] Product ID: ${CADRACODE_PRODUCT_ID}`);
     console.log(
       `[Checkout] Return URL: ${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/action/payment-success`
     );
@@ -121,7 +121,7 @@ export async function POST() {
       const session = await dodo.checkoutSessions.create({
         product_cart: [
           {
-            product_id: LEGACYVIBE_PRODUCT_ID,
+            product_id: CADRACODE_PRODUCT_ID,
             quantity: 1,
           },
         ],

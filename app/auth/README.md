@@ -1,6 +1,6 @@
 # Authentication Setup - Production Ready
 
-This directory contains all authentication-related server actions and routes for LegacyVibe with **Zod validation** and comprehensive error handling.
+This directory contains all authentication-related server actions and routes for Cadracode with **Zod validation** and comprehensive error handling.
 
 ## 📁 Structure
 
