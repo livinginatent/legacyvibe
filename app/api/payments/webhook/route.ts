@@ -264,7 +264,7 @@ async function grantScans(userId: string, paymentId?: string) {
       payment_date: new Date().toISOString(),
       payment_status: "succeeded",
       scans_used: 0,
-      scans_limit: 5,
+      scans_limit: 10,
       period_start: new Date().toISOString(),
       period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       updated_at: new Date().toISOString(),
@@ -288,7 +288,7 @@ async function grantScans(userId: string, paymentId?: string) {
     }
 
     console.log(
-      `[Dodo Webhook] SUCCESS: Granted 5 scans to user ${userId}. DB response:`,
+      `[Dodo Webhook] SUCCESS: Granted 10 blast radius scans to user ${userId}. DB response:`,
       JSON.stringify(data)
     );
   } catch (err) {

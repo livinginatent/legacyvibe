@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         payment_status: "succeeded",
         payment_date: new Date().toISOString(),
         scans_used: 0,
-        scans_limit: 5,
+        scans_limit: 10,
         period_start: new Date().toISOString(),
         period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString(),
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Payment verified! You now have 5 scans.",
+      message: "Payment verified! You now have 10 blast radius scans.",
     });
   } catch (error) {
     console.error("[Payment Verify] Error:", error);

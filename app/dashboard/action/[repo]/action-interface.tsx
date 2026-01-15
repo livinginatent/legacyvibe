@@ -369,7 +369,7 @@ export function ActionInterface({
   const [selectedNode, setSelectedNode] = useState<FeatureNode | null>(null);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
 
-  // Impact Analysis state
+  // Impact Analysis / Blast Radius state
   const [showImpactSearch, setShowImpactSearch] = useState(false);
   const [impactSearchQuery, setImpactSearchQuery] = useState("");
   const [impactResult, setImpactResult] = useState<ImpactAnalysisResult | null>(
@@ -377,6 +377,13 @@ export function ActionInterface({
   );
   const [isAnalyzingImpact, setIsAnalyzingImpact] = useState(false);
   const [impactError, setImpactError] = useState<string | null>(null);
+
+  // Blast Radius file tree state
+  const [fileTree, setFileTree] = useState<
+    { path: string; type: "file" | "dir"; size?: number }[]
+  >([]);
+  const [isLoadingFileTree, setIsLoadingFileTree] = useState(false);
+  const [fileTreeError, setFileTreeError] = useState<string | null>(null);
 
   // Onboarding state
   const [onboardingMode, setOnboardingMode] = useState(false);
@@ -478,9 +485,45 @@ export function ActionInterface({
 
     loadCachedAnalysis();
   }, [repoFullName, installationId]);
+  // Lazy-load file tree when Blast Radius panel is opened
+  useEffect(() => {
+    const loadFileTree = async () => {
+      if (!showImpactSearch) return;
 
-  const handleImpactAnalysis = async () => {
-    if (!impactSearchQuery.trim()) {
+      setIsLoadingFileTree(true);
+      setFileTreeError(null);
+
+      try {
+        const response = await fetch(
+          `/api/file-tree?repo=${encodeURIComponent(repoFullName)}`
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          throw new Error(
+            errorData?.error || "Failed to load repository file tree"
+          );
+        }
+
+        const data = await response.json();
+        setFileTree(data.fileTree || []);
+      } catch (err) {
+        setFileTreeError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load repository file tree"
+        );
+      } finally {
+        setIsLoadingFileTree(false);
+      }
+    };
+
+    loadFileTree();
+  }, [showImpactSearch, repoFullName]);
+
+  const handleImpactAnalysis = async (filePathOverride?: string) => {
+    const targetPath = (filePathOverride ?? impactSearchQuery).trim();
+    if (!targetPath) {
       setImpactError("Please enter a file path");
       return;
     }
@@ -495,7 +538,7 @@ export function ActionInterface({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           repoFullName,
-          filePath: impactSearchQuery.trim(),
+          filePath: targetPath,
         }),
       });
 
@@ -1163,7 +1206,7 @@ export function ActionInterface({
                 className="border-emerald-500/50 hover:bg-emerald-500/10 font-mono gap-2 text-emerald-400"
               >
                 <Target className="w-4 h-4" />
-                Impact Analysis
+                Blast Radius
               </Button>
 
               <Button
@@ -1230,63 +1273,147 @@ export function ActionInterface({
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-mono font-bold text-emerald-400 mb-2">
-                  IMPACT ANALYSIS ENGINE
+                  BLAST RADIUS MAP
                 </h3>
                 <p className="text-sm text-gray-400 mb-4 font-mono">
-                  Enter a file path to see which features will be affected by
-                  changes
+                  Pick a file (or enter a path) to see the blast radius of a
+                  change – which high-level features and flows depend on it,
+                  directly and indirectly.
                 </p>
 
-                <div className="flex gap-2">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
-                    <input
-                      type="text"
-                      value={impactSearchQuery}
-                      onChange={(e) => setImpactSearchQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleImpactAnalysis();
-                        }
-                      }}
-                      placeholder="e.g., app/auth/actions.ts or components/Button.tsx"
-                      className="w-full bg-black border border-emerald-500/30 rounded-lg px-10 py-3 font-mono text-sm text-foreground placeholder:text-gray-600 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                  </div>
-                  <Button
-                    onClick={handleImpactAnalysis}
-                    disabled={isAnalyzingImpact}
-                    className="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-black font-semibold font-mono gap-2"
-                  >
-                    {isAnalyzingImpact ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>ANALYZING...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Waves className="w-4 h-4" />
-                        <span>ANALYZE IMPACT</span>
-                      </>
+                <div className="flex flex-col lg:flex-row gap-6">
+                  {/* File path input + actions */}
+                  <div className="flex-1 space-y-3">
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                        <input
+                          type="text"
+                          value={impactSearchQuery}
+                          onChange={(e) => setImpactSearchQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleImpactAnalysis();
+                            }
+                          }}
+                          placeholder="e.g., app/auth/actions.ts or components/Button.tsx"
+                          className="w-full bg-black border border-emerald-500/30 rounded-lg px-10 py-3 font-mono text-sm text-foreground placeholder:text-gray-600 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => handleImpactAnalysis()}
+                        disabled={isAnalyzingImpact}
+                        className="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-black font-semibold font-mono gap-2"
+                      >
+                        {isAnalyzingImpact ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>ANALYZING...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Waves className="w-4 h-4" />
+                            <span>RUN BLAST RADIUS</span>
+                          </>
+                        )}
+                      </Button>
+                      {impactResult && (
+                        <Button
+                          onClick={clearImpactAnalysis}
+                          variant="outline"
+                          className="border-gray-500/50 hover:bg-gray-500/10 font-mono"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    {impactError && (
+                      <div className="mt-1 text-sm font-mono text-red-400 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        {impactError}
+                      </div>
                     )}
-                  </Button>
-                  {impactResult && (
-                    <Button
-                      onClick={clearImpactAnalysis}
-                      variant="outline"
-                      className="border-gray-500/50 hover:bg-gray-500/10 font-mono"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
+                  </div>
+
+                  {/* GitHub-like file tree */}
+                  <div className="w-full lg:w-80 max-h-72 overflow-auto rounded-lg border border-emerald-500/20 bg-black/40 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <FileCode className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-mono text-gray-300">
+                          Repository Files
+                        </span>
+                      </div>
+                      {isLoadingFileTree && (
+                        <Loader2 className="w-3 h-3 text-emerald-400 animate-spin" />
+                      )}
+                    </div>
+
+                    {fileTreeError && (
+                      <p className="text-xs font-mono text-red-400">
+                        {fileTreeError}
+                      </p>
+                    )}
+
+                    {!fileTreeError && !isLoadingFileTree && fileTree.length === 0 && (
+                      <p className="text-xs font-mono text-gray-500">
+                        File tree not available yet. Run a full analysis first.
+                      </p>
+                    )}
+
+                    {!fileTreeError && fileTree.length > 0 && (
+                      <div className="space-y-2">
+                        {Object.entries(
+                          fileTree
+                            .filter((node) => node.type === "file")
+                            .reduce<Record<string, string[]>>((acc, node) => {
+                              const segments = node.path.split("/");
+                              const top =
+                                segments.length > 1 ? segments[0] : "(root)";
+                              if (!acc[top]) acc[top] = [];
+                              acc[top].push(node.path);
+                              return acc;
+                            }, {})
+                        )
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([topDir, paths]) => (
+                            <div key={topDir}>
+                              <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 mb-1">
+                                <ChevronRight className="w-3 h-3" />
+                                <span>{topDir}</span>
+                              </div>
+                              <ul className="space-y-0.5 ml-5">
+                                {paths
+                                  .sort((a, b) => a.localeCompare(b))
+                                  .slice(0, 20)
+                                  .map((path) => (
+                                    <li key={path}>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setImpactSearchQuery(path);
+                                          handleImpactAnalysis(path);
+                                        }}
+                                        className="w-full text-left text-[11px] font-mono text-gray-300 hover:text-emerald-300 hover:bg-emerald-500/10 rounded px-1 py-0.5"
+                                      >
+                                        {path.replace(`${topDir}/`, "")}
+                                      </button>
+                                    </li>
+                                  ))}
+                                {paths.length > 20 && (
+                                  <li className="text-[11px] font-mono text-gray-500">
+                                    + {paths.length - 20} more…
+                                  </li>
+                                )}
+                              </ul>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {impactError && (
-                  <div className="mt-3 text-sm font-mono text-red-400 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    {impactError}
-                  </div>
-                )}
               </div>
             </div>
           </div>

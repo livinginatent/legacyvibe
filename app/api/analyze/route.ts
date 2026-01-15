@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
           {
             error: "PAYMENT_REQUIRED",
             message:
-              "Please complete the one-time $14.99 payment to unlock 5 scans.",
+              "Please complete the one-time $14.99 payment to unlock 10 blast radius scans.",
             requiresPayment: true,
           },
           { status: 402 } // 402 Payment Required
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error: "USAGE_LIMIT_REACHED",
-            message: `You've used all ${usage.scans_limit} scans. Pay $14.99 to unlock 5 more scans.`,
+            message: `You've used all ${usage.scans_limit} blast radius scans. Pay $14.99 to unlock 10 more scans.`,
             usage: {
               used: usage.scans_used,
               limit: usage.scans_limit,
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
         {
           user_id: user.id,
           scans_used: newScansUsed,
-          scans_limit: 5,
+          scans_limit: 10,
           updated_at: new Date().toISOString(),
         },
         {
