@@ -641,6 +641,10 @@ export function ActionInterface({
     setOnboardingError(null);
 
     try {
+      // Create an AbortController with a 5-minute timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minutes
+
       const response = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -648,10 +652,31 @@ export function ActionInterface({
           repoFullName,
           userLevel: "intermediate",
         }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        const errorData = await response.json();
+        // Handle timeout errors specifically
+        if (response.status === 504 || response.status === 408) {
+          throw new Error(
+            "Request timed out. The analysis is taking longer than expected. Please try again or contact support if this persists."
+          );
+        }
+        
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          // If response isn't JSON, it might be a timeout
+          if (response.status === 504 || response.status === 408) {
+            throw new Error(
+              "Request timed out. The analysis is taking longer than expected. Please try again."
+            );
+          }
+          throw new Error("Failed to generate onboarding path");
+        }
         throw new Error(
           errorData.error || "Failed to generate onboarding path"
         );
@@ -689,11 +714,25 @@ export function ActionInterface({
       }
     } catch (err) {
       console.error("Onboarding generation error:", err);
-      setOnboardingError(
-        err instanceof Error
-          ? err.message
-          : "Failed to generate onboarding path"
-      );
+      
+      // Handle abort/timeout errors
+      if (err instanceof Error && err.name === "AbortError") {
+        setOnboardingError(
+          "Request timed out after 5 minutes. The analysis is taking longer than expected. Please try again or contact support if this persists."
+        );
+      } else if (err instanceof Error && err.message.includes("timeout")) {
+        setOnboardingError(err.message);
+      } else if (err instanceof Error && err.message.includes("JSON.parse")) {
+        setOnboardingError(
+          "The server response was incomplete (likely due to timeout). Please try again. If this persists, the repository may be too large for analysis."
+        );
+      } else {
+        setOnboardingError(
+          err instanceof Error
+            ? err.message
+            : "Failed to generate onboarding path"
+        );
+      }
     } finally {
       setIsGeneratingOnboarding(false);
     }
@@ -1196,7 +1235,7 @@ export function ActionInterface({
                   {isGeneratingOnboarding ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Generating...</span>
+                      <span>Analyzing...</span>
                     </>
                   ) : (
                     <>
@@ -1583,8 +1622,28 @@ export function ActionInterface({
         </div>
       )}
 
+      {/* Onboarding Loading State */}
+      {isGeneratingOnboarding && (
+        <div className="glass-card border border-purple-500/30 p-6 bg-purple-500/5 animate-fade-in-up">
+          <div className="flex items-start gap-3">
+            <Loader2 className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5 animate-spin" />
+            <div>
+              <h3 className="font-mono font-semibold text-purple-400 mb-2">
+                GENERATING ONBOARDING PATH
+              </h3>
+              <p className="text-sm font-mono text-muted-foreground mb-2">
+                Analyzing your codebase structure and creating a personalized learning path...
+              </p>
+              <p className="text-xs font-mono text-muted-foreground/70">
+                ⏱️ This may take 2-3 minutes for large repositories. Please don&apos;t close this page.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Onboarding Error State */}
-      {onboardingError && (
+      {onboardingError && !isGeneratingOnboarding && (
         <div className="glass-card border border-destructive/30 p-6 bg-destructive/5 animate-fade-in-up">
           <div className="flex items-start gap-3">
             <GraduationCap className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
@@ -1806,7 +1865,7 @@ export function ActionInterface({
                       {h.reasons && h.reasons.length > 0 && (
                         <div>
                           <p className="text-[11px] font-mono text-gray-500 mb-1">
-                            Why it's a hotspot:
+                            Why it&apos;s a hotspot:
                           </p>
                           <ul className="space-y-0.5">
                             {h.reasons.map((reason: string, idx: number) => (

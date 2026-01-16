@@ -8,7 +8,7 @@ import { createClient } from "@/app/src/utils/supabase/server";
 import Anthropic from "@anthropic-ai/sdk";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300; // 5 minutes - allows for complex analysis
 
 interface OnboardingRequest {
   repoFullName: string;
@@ -317,15 +317,42 @@ Generate a personalized learning path that will help a new developer understand 
     stream: true,
   });
 
-  // Accumulate the streamed response
+  // Accumulate the streamed response with timeout protection
   let fullText = "";
-  for await (const chunk of stream) {
-    if (
-      chunk.type === "content_block_delta" &&
-      chunk.delta.type === "text_delta"
-    ) {
-      fullText += chunk.delta.text;
+  const streamTimeout = 4.5 * 60 * 1000; // 4.5 minutes (leave buffer for processing)
+  const streamStartTime = Date.now();
+
+  try {
+    for await (const chunk of stream) {
+      // Check for timeout during streaming
+      if (Date.now() - streamStartTime > streamTimeout) {
+        console.error("Stream timeout during Claude response accumulation");
+        throw new Error(
+          "Analysis timed out while processing. The repository may be too large. Please try again or contact support."
+        );
+      }
+
+      if (
+        chunk.type === "content_block_delta" &&
+        chunk.delta.type === "text_delta"
+      ) {
+        fullText += chunk.delta.text;
+      }
     }
+  } catch (streamError) {
+    if (streamError instanceof Error && streamError.message.includes("timeout")) {
+      throw streamError;
+    }
+    // Re-throw other stream errors
+    throw streamError;
+  }
+
+  // Validate we got a response
+  if (!fullText || fullText.trim().length === 0) {
+    console.error("Empty response from Claude");
+    throw new Error(
+      "Received empty response from AI. This may indicate a timeout. Please try again."
+    );
   }
 
   // Parse the JSON response
@@ -334,8 +361,11 @@ Generate a personalized learning path that will help a new developer understand 
 
   const jsonMatch = fullText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    console.error("No JSON found in response:", fullText);
-    throw new Error("No JSON object found in Claude's response");
+    console.error("No JSON found in response. Full text length:", fullText.length);
+    console.error("First 1000 chars:", fullText.substring(0, 1000));
+    throw new Error(
+      "No JSON object found in Claude's response. The response may have been cut off due to timeout."
+    );
   }
 
   let learningPath: OnboardingPath;
@@ -343,11 +373,21 @@ Generate a personalized learning path that will help a new developer understand 
     learningPath = JSON.parse(jsonMatch[0]);
   } catch (parseError) {
     console.error("JSON parse error:", parseError);
-    console.error("JSON string:", jsonMatch[0].substring(0, 1000));
+    console.error("JSON string length:", jsonMatch[0].length);
+    console.error("First 1000 chars of JSON:", jsonMatch[0].substring(0, 1000));
+    console.error("Last 500 chars of JSON:", jsonMatch[0].substring(Math.max(0, jsonMatch[0].length - 500)));
+    
+    // Check if JSON appears truncated (common on timeout)
+    if (jsonMatch[0].length > 100 && !jsonMatch[0].trim().endsWith("}")) {
+      throw new Error(
+        "The response appears to be incomplete (likely due to timeout). Please try again. If this persists, the repository may be too large for analysis."
+      );
+    }
+    
     throw new Error(
       `Failed to parse Claude's response: ${
         parseError instanceof Error ? parseError.message : "Unknown error"
-      }`
+      }. The response may have been truncated due to timeout.`
     );
   }
 
