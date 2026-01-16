@@ -14,14 +14,13 @@ const Footer = () => {
 
           {/* Links */}
           <div className="flex items-center gap-8">
-           
-           
             <a
-              href="#"
-              className="text-muted-foreground hover:text-primary transition-colors duration-300 text-sm"
+              href="/privacy"
+              className="text-muted-foreground hover:text-primary transition-colors duration-300 text-sm font-mono"
             >
-              Terms of Service
+              Privacy Policy
             </a>
+     
           </div>
         </div>
 
