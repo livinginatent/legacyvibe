@@ -104,7 +104,7 @@ const BentoFeatures = () => {
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-semibold text-foreground mb-2">
-                  Change Impact Engine
+                  Blast Radius Analysis
                 </h3>
                 <p className="font-mono text-sm text-muted-foreground mb-4">
                   See exactly what breaks when you modify a file. Visual dependency tracing 
@@ -209,7 +209,7 @@ const BentoFeatures = () => {
             </div>
           </div>
 
-          {/* Technical Debt Heatmap */}
+          {/* Technical Debt Audit */}
           <div className="glass-card p-8 glow-border flex flex-col">
             <div className="font-mono text-xs text-primary/60 tracking-widest mb-4">
               DEBT TRACKING
@@ -220,22 +220,37 @@ const BentoFeatures = () => {
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-semibold text-foreground mb-2">
-                  Technical Debt Heatmap
+                  Technical Debt Audit
                 </h3>
                 <p className="font-mono text-sm text-muted-foreground mb-4">
-                  Track risk levels over time. See which features are degrading 
-                  and prioritize refactoring efforts.
+                  One-time, repo-wide assessment. Identifies hotspot features, 
+                  scores 7 categories, and prioritizes actionable fixes.
                 </p>
                 
                 {/* Mockup */}
                 <div className="bg-background/50 rounded-lg p-4 border border-border">
-                  <div className="flex items-end gap-1 h-16">
-                    <div className="flex-1 bg-green-500 rounded-t" style={{ height: '40%' }} />
-                    <div className="flex-1 bg-yellow-500 rounded-t" style={{ height: '60%' }} />
-                    <div className="flex-1 bg-red-500 rounded-t ring-2 ring-primary" style={{ height: '80%' }} />
-                  </div>
-                  <div className="font-mono text-xs text-muted-foreground mt-2 text-center">
-                    Risk Score: 68 → 72 → 85
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs text-muted-foreground">Overall Score</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-lg font-bold text-red-400">59/100</span>
+                        <span className="font-mono text-xs px-2 py-0.5 rounded border border-red-500/40 text-red-300">Grade D</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        <span className="text-xs font-mono text-red-400">3 hotspot features</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+                        <span className="text-xs font-mono text-yellow-400">Architecture: 45/100</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                        <span className="text-xs font-mono text-orange-400">Testing: 40/100</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

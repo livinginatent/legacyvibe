@@ -43,6 +43,7 @@ import {
   Flag,
   FileDown,
   Download,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/app/src/components/ui/button";
 import Link from "next/link";
@@ -399,7 +400,7 @@ export function ActionInterface({
   const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
   const [docsError, setDocsError] = useState<string | null>(null);
 
-  // Debt Heatmap state
+  // Technical Debt Audit state (one-time per repo)
   const [showDebtHeatmap, setShowDebtHeatmap] = useState(false);
   const [heatmapData, setHeatmapData] = useState<any>(null);
   const [isLoadingHeatmap, setIsLoadingHeatmap] = useState(false);
@@ -843,28 +844,32 @@ export function ActionInterface({
     }
   };
 
-  // Debt Heatmap functions
+  // Technical Debt Audit functions
   const loadDebtHeatmap = async () => {
     setIsLoadingHeatmap(true);
     setHeatmapError(null);
 
     try {
       const response = await fetch(
-        `/api/debt-heatmap?repo=${encodeURIComponent(repoFullName)}&limit=10`
+        `/api/debt-heatmap?repo=${encodeURIComponent(repoFullName)}`
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to load heatmap");
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.error || "Failed to load technical debt audit"
+        );
       }
 
       const data = await response.json();
       setHeatmapData(data);
       setShowDebtHeatmap(true);
     } catch (err) {
-      console.error("Heatmap error:", err);
+      console.error("Technical debt audit error:", err);
       setHeatmapError(
-        err instanceof Error ? err.message : "Failed to load heatmap"
+        err instanceof Error
+          ? err.message
+          : "Failed to load technical debt audit"
       );
     } finally {
       setIsLoadingHeatmap(false);
@@ -1153,7 +1158,7 @@ export function ActionInterface({
           </Button>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="space-y-4">
           {result?.cached && result?.analyzedAt && (
             <div className="flex items-center gap-2 text-sm font-mono text-muted-foreground">
               <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -1161,105 +1166,107 @@ export function ActionInterface({
             </div>
           )}
 
-          <Button
-            onClick={handleAnalyze}
-            disabled={isAnalyzing}
-            className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold font-mono gap-2"
-          >
-            {isAnalyzing ? (
+          <div className="grid grid-cols-3 gap-3">
+            <Button
+              onClick={handleAnalyze}
+              disabled={isAnalyzing}
+              className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold font-mono gap-2"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>ANALYZING...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4" />
+                  <span>{result ? "REANALYZE" : "START ANALYSIS"}</span>
+                </>
+              )}
+            </Button>
+
+            {result && !isAnalyzing && (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>ANALYZING...</span>
-              </>
-            ) : (
-              <>
-                <Zap className="w-4 h-4" />
-                <span>{result ? "REANALYZE" : "START ANALYSIS"}</span>
+                <Button
+                  onClick={generateOnboardingPath}
+                  disabled={isGeneratingOnboarding}
+                  variant="outline"
+                  className="border-purple-500/50 hover:bg-purple-500/10 hover:text-purple-300 font-mono gap-2 text-purple-400"
+                >
+                  {isGeneratingOnboarding ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <GraduationCap className="w-4 h-4" />
+                      <span>Onboarding</span>
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => setShowImpactSearch(!showImpactSearch)}
+                  variant="outline"
+                  className="border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-300 font-mono gap-2 text-emerald-400"
+                >
+                  <Target className="w-4 h-4" />
+                  Blast Radius
+                </Button>
+
+                <Button
+                  onClick={() => exportDocumentation("markdown")}
+                  disabled={isGeneratingDocs}
+                  variant="outline"
+                  className="border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-300 font-mono gap-2 text-blue-400"
+                >
+                  {isGeneratingDocs ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="w-4 h-4" />
+                      <span>Export Docs</span>
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={loadDebtHeatmap}
+                  disabled={isLoadingHeatmap}
+                  variant="outline"
+                  className="border-red-500/50 hover:bg-red-500/10 hover:text-red-300 font-mono gap-2 text-red-400"
+                >
+                  {isLoadingHeatmap ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Loading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Activity className="w-4 h-4" />
+                      <span>Technical Debt Audit</span>
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => {
+                    setForceRescan(true);
+                    setTimeout(() => handleAnalyze(), 100);
+                  }}
+                  variant="outline"
+                  className="border-primary/50 hover:bg-primary/10 hover:text-primary font-mono gap-2 text-foreground"
+                >
+                  <Terminal className="w-4 h-4" />
+                  Force Rescan
+                </Button>
               </>
             )}
-          </Button>
-
-          {result && !isAnalyzing && (
-            <>
-              <Button
-                onClick={generateOnboardingPath}
-                disabled={isGeneratingOnboarding}
-                variant="outline"
-                className="border-purple-500/50 hover:bg-purple-500/10 font-mono gap-2 text-purple-400"
-              >
-                {isGeneratingOnboarding ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <GraduationCap className="w-4 h-4" />
-                    <span>Onboarding</span>
-                  </>
-                )}
-              </Button>
-
-              <Button
-                onClick={() => setShowImpactSearch(!showImpactSearch)}
-                variant="outline"
-                className="border-emerald-500/50 hover:bg-emerald-500/10 font-mono gap-2 text-emerald-400"
-              >
-                <Target className="w-4 h-4" />
-                Blast Radius
-              </Button>
-
-              <Button
-                onClick={() => exportDocumentation("markdown")}
-                disabled={isGeneratingDocs}
-                variant="outline"
-                className="border-blue-500/50 hover:bg-blue-500/10 font-mono gap-2 text-blue-400"
-              >
-                {isGeneratingDocs ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Exporting...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileDown className="w-4 h-4" />
-                    <span>Export Docs</span>
-                  </>
-                )}
-              </Button>
-
-              <Button
-                onClick={loadDebtHeatmap}
-                disabled={isLoadingHeatmap}
-                variant="outline"
-                className="border-red-500/50 hover:bg-red-500/10 font-mono gap-2 text-red-400"
-              >
-                {isLoadingHeatmap ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Loading...</span>
-                  </>
-                ) : (
-                  <>
-                    <Activity className="w-4 h-4" />
-                    <span>Debt Heatmap</span>
-                  </>
-                )}
-              </Button>
-
-              <Button
-                onClick={() => {
-                  setForceRescan(true);
-                  setTimeout(() => handleAnalyze(), 100);
-                }}
-                variant="outline"
-                className="border-primary/50 hover:bg-primary/10 font-mono gap-2"
-              >
-                <Terminal className="w-4 h-4" />
-                Force Rescan
-              </Button>
-            </>
-          )}
+          </div>
         </div>
       </div>
 
@@ -1610,7 +1617,7 @@ export function ActionInterface({
         </div>
       )}
 
-      {/* Technical Debt Heatmap */}
+      {/* Technical Debt Audit */}
       {showDebtHeatmap && heatmapData && (
         <div className="space-y-4 animate-fade-in-up">
           {/* Header */}
@@ -1619,12 +1626,19 @@ export function ActionInterface({
               <div className="flex-1">
                 <h3 className="text-2xl font-mono font-bold text-red-400 mb-2 flex items-center gap-2">
                   <Activity className="w-7 h-7" />
-                  TECHNICAL DEBT HEATMAP
+                  TECHNICAL DEBT AUDIT
                 </h3>
                 <p className="text-sm font-mono text-gray-300">
-                  Time-series analysis of risk levels across{" "}
-                  {heatmapData.summary.totalScans} scans
+                  One-time, repo-wide assessment of structural risk,
+                  coupling, and refactor difficulty for{" "}
+                  {heatmapData.repoFullName}
                 </p>
+                {heatmapData?.constraints?.alreadyAnalyzed && (
+                  <p className="mt-1 text-xs font-mono text-amber-300">
+                    This audit is locked: one run per repo. Update the codebase
+                    and rerun the main analysis to improve the picture.
+                  </p>
+                )}
               </div>
               <Button
                 onClick={() => setShowDebtHeatmap(false)}
@@ -1635,228 +1649,119 @@ export function ActionInterface({
               </Button>
             </div>
 
-            {/* Overall Trend Summary */}
+            {/* Overall Technical Debt Summary */}
             <div className="mt-4 grid grid-cols-4 gap-4">
               <div className="glass-card border border-gray-700 p-4">
                 <p className="text-xs font-mono text-gray-400 mb-1">
-                  Overall Trend
+                  Overall Grade
                 </p>
                 <div className="flex items-center gap-2">
-                  {heatmapData.summary.overallTrend === "improving" ? (
-                    <TrendingDown className="w-5 h-5 text-green-400" />
-                  ) : heatmapData.summary.overallTrend === "degrading" ? (
-                    <TrendingUp className="w-5 h-5 text-red-400" />
-                  ) : (
-                    <Minus className="w-5 h-5 text-yellow-400" />
-                  )}
+                  <Shield className="w-5 h-5 text-red-400" />
                   <span
                     className={`text-lg font-mono font-bold ${
-                      heatmapData.summary.overallTrend === "improving"
+                      heatmapData.grade === "A"
                         ? "text-green-400"
-                        : heatmapData.summary.overallTrend === "degrading"
-                        ? "text-red-400"
-                        : "text-yellow-400"
+                        : heatmapData.grade === "B"
+                        ? "text-emerald-300"
+                        : heatmapData.grade === "C"
+                        ? "text-yellow-300"
+                        : heatmapData.grade === "D"
+                        ? "text-orange-300"
+                        : "text-red-400"
                     }`}
                   >
-                    {heatmapData.summary.overallTrend.toUpperCase()}
+                    {heatmapData.grade}
                   </span>
                 </div>
               </div>
 
               <div className="glass-card border border-gray-700 p-4">
                 <p className="text-xs font-mono text-gray-400 mb-1">
-                  Risk Score Delta
+                  Overall Score
                 </p>
                 <div className="flex items-center gap-2">
-                  {heatmapData.summary.riskScoreDelta > 0 ? (
-                    <AlertTriangle className="w-5 h-5 text-red-400" />
-                  ) : (
-                    <CheckCircle2 className="w-5 h-5 text-green-400" />
-                  )}
-                  <span
-                    className={`text-lg font-mono font-bold ${
-                      heatmapData.summary.riskScoreDelta > 0
-                        ? "text-red-400"
-                        : "text-green-400"
-                    }`}
-                  >
-                    {heatmapData.summary.riskScoreDelta > 0 ? "+" : ""}
-                    {heatmapData.summary.riskScoreDelta}
+                  <Gauge className="w-5 h-5 text-cyan-400" />
+                  <span className="text-lg font-mono font-bold text-cyan-300">
+                    {heatmapData.overallScore}/100
                   </span>
                 </div>
               </div>
 
               <div className="glass-card border border-gray-700 p-4">
                 <p className="text-xs font-mono text-gray-400 mb-1">
-                  High Risk Added
+                  Hotspot Features
                 </p>
                 <div className="flex items-center gap-2">
-                  <Plus className="w-5 h-5 text-red-400" />
+                  <Flame className="w-5 h-5 text-red-400" />
                   <span className="text-lg font-mono font-bold text-red-400">
-                    {heatmapData.summary.highRiskAdded}
+                    {heatmapData.hotspots?.length || 0}
                   </span>
                 </div>
               </div>
 
               <div className="glass-card border border-gray-700 p-4">
                 <p className="text-xs font-mono text-gray-400 mb-1">
-                  High Risk Removed
+                  Snapshot Time
                 </p>
                 <div className="flex items-center gap-2">
-                  <Minus className="w-5 h-5 text-green-400" />
+                  <Clock className="w-5 h-5 text-gray-300" />
                   <span className="text-lg font-mono font-bold text-green-400">
-                    {heatmapData.summary.highRiskRemoved}
+                    {formatDate(heatmapData.analyzedAt)}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Risk Score Timeline */}
+          {/* Category Breakdown + Narrative */}
           <div className="glass-card border border-red-500/30 p-6">
-            <h4 className="text-lg font-mono font-bold text-red-400 mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5" />
-              RISK SCORE TIMELINE
+            <h4 className="text-lg font-mono font-bold text-red-400 mb-3 flex items-center gap-2">
+              <BookOpen className="w-5 h-5" />
+              HOW THE DEBT SHOWS UP
             </h4>
+            <p className="text-sm font-mono text-gray-300 mb-4">
+              {heatmapData.narrative}
+            </p>
 
-            <div className="relative h-48 border border-gray-700 rounded bg-black/50 p-4">
-              {/* Timeline visualization */}
-              <div className="flex items-end justify-between h-full gap-2">
-                {heatmapData.snapshots
-                  .slice()
-                  .reverse()
-                  .map((snapshot: any, index: number) => {
-                    const height = `${snapshot.riskScore}%`;
-                    const date = new Date(
-                      snapshot.analyzedAt
-                    ).toLocaleDateString();
-                    const isLatest = index === heatmapData.snapshots.length - 1;
-
-                    return (
-                      <div
-                        key={index}
-                        className="flex-1 flex flex-col items-center gap-2"
-                      >
-                        <div
-                          className={`w-full rounded-t transition-all ${
-                            snapshot.riskScore > 70
-                              ? "bg-red-500"
-                              : snapshot.riskScore > 40
-                              ? "bg-yellow-500"
-                              : "bg-green-500"
-                          } ${isLatest ? "ring-2 ring-cyan-400" : ""}`}
-                          style={{ height }}
-                          title={`Risk Score: ${snapshot.riskScore}`}
-                        />
-                        <span className="text-[10px] font-mono text-gray-400 rotate-45 origin-top-left">
-                          {date}
-                        </span>
-                      </div>
-                    );
-                  })}
-              </div>
-
-              {/* Y-axis labels */}
-              <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-[10px] font-mono text-gray-500">
-                <span>100</span>
-                <span>75</span>
-                <span>50</span>
-                <span>25</span>
-                <span>0</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Risk Trends by Feature */}
-          <div className="glass-card border border-red-500/30 p-6">
-            <h4 className="text-lg font-mono font-bold text-red-400 mb-4 flex items-center gap-2">
-              <Flame className="w-5 h-5" />
-              FEATURE RISK TRENDS
-            </h4>
-
-            <div className="space-y-2">
-              {heatmapData.trends.slice(0, 10).map((trend: any) => {
-                const getTrendColor = () => {
-                  if (trend.trend === "increasing")
-                    return "text-red-400 bg-red-500/10 border-red-500/30";
-                  if (trend.trend === "decreasing")
-                    return "text-green-400 bg-green-500/10 border-green-500/30";
-                  if (trend.trend === "new")
-                    return "text-cyan-400 bg-cyan-500/10 border-cyan-500/30";
-                  return "text-gray-400 bg-gray-500/10 border-gray-500/30";
-                };
-
-                const getTrendIcon = () => {
-                  if (trend.trend === "increasing")
-                    return <TrendingUp className="w-4 h-4" />;
-                  if (trend.trend === "decreasing")
-                    return <TrendingDown className="w-4 h-4" />;
-                  if (trend.trend === "new")
-                    return <Plus className="w-4 h-4" />;
-                  return <Minus className="w-4 h-4" />;
-                };
-
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { key: "architecture", label: "Architecture" },
+                { key: "codeQuality", label: "Code Quality" },
+                { key: "testing", label: "Testing" },
+                { key: "tooling", label: "Tooling" },
+                { key: "documentation", label: "Documentation" },
+                { key: "process", label: "Process & Workflow" },
+                { key: "performance", label: "Performance & Scalability" },
+              ].map((cat) => {
+                const value = heatmapData.categories?.[cat.key] ?? 0;
+                const barColor =
+                  value >= 80
+                    ? "bg-green-500"
+                    : value >= 60
+                    ? "bg-emerald-400"
+                    : value >= 45
+                    ? "bg-yellow-400"
+                    : value >= 30
+                    ? "bg-orange-400"
+                    : "bg-red-500";
                 return (
                   <div
-                    key={trend.nodeId}
-                    className={`glass-card border p-4 hover:bg-opacity-20 transition-all ${getTrendColor()}`}
+                    key={cat.key}
+                    className="glass-card border border-gray-800 p-3"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          {getTrendIcon()}
-                          <h5 className="font-mono font-bold">
-                            {trend.nodeLabel}
-                          </h5>
-                          <span className="text-xs font-mono px-2 py-0.5 rounded border">
-                            {trend.trend.toUpperCase()}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-4 text-sm font-mono">
-                          {trend.previousRisk && (
-                            <>
-                              <span className="text-gray-400">
-                                Was:{" "}
-                                <span
-                                  className={getRiskColor(trend.previousRisk)}
-                                >
-                                  {trend.previousRisk}
-                                </span>
-                              </span>
-                              <ArrowRight className="w-4 h-4 text-gray-500" />
-                            </>
-                          )}
-                          <span className="text-gray-400">
-                            Now:{" "}
-                            <span className={getRiskColor(trend.currentRisk)}>
-                              {trend.currentRisk}
-                            </span>
-                          </span>
-                        </div>
-
-                        {/* Mini timeline */}
-                        <div className="mt-2 flex gap-1">
-                          {trend.snapshots
-                            .slice(0, 5)
-                            .reverse()
-                            .map((snap: any, i: number) => (
-                              <div
-                                key={i}
-                                className={`w-3 h-3 rounded-sm ${
-                                  snap.risk === "High"
-                                    ? "bg-red-500"
-                                    : snap.risk === "Med"
-                                    ? "bg-yellow-500"
-                                    : "bg-green-500"
-                                }`}
-                                title={`${snap.risk} - ${new Date(
-                                  snap.date
-                                ).toLocaleDateString()}`}
-                              />
-                            ))}
-                        </div>
-                      </div>
+                    <p className="text-xs font-mono text-gray-400 mb-1">
+                      {cat.label}
+                    </p>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-mono text-gray-200">
+                        {value}/100
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${barColor}`}
+                        style={{ width: `${value}%` }}
+                      />
                     </div>
                   </div>
                 );
@@ -1864,53 +1769,171 @@ export function ActionInterface({
             </div>
           </div>
 
-          {/* Most Improved / Most Degraded */}
-          {(heatmapData.summary.mostImprovedNodes.length > 0 ||
-            heatmapData.summary.mostDegradedNodes.length > 0) && (
-            <div className="grid grid-cols-2 gap-4">
-              {heatmapData.summary.mostImprovedNodes.length > 0 && (
-                <div className="glass-card border border-green-500/30 bg-green-500/5 p-6">
-                  <h4 className="text-lg font-mono font-bold text-green-400 mb-4 flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5" />
-                    MOST IMPROVED
-                  </h4>
-                  <ul className="space-y-2">
-                    {heatmapData.summary.mostImprovedNodes.map(
-                      (node: string, i: number) => (
-                        <li
-                          key={i}
-                          className="text-sm font-mono text-green-300 flex items-center gap-2"
-                        >
-                          <TrendingDown className="w-4 h-4 flex-shrink-0" />
-                          {node}
-                        </li>
-                      )
-                    )}
-                  </ul>
-                </div>
-              )}
+          {/* Hotspots */}
+          {heatmapData.hotspots && heatmapData.hotspots.length > 0 && (
+            <div className="glass-card border border-red-500/30 p-6">
+              <h4 className="text-lg font-mono font-bold text-red-400 mb-3 flex items-center gap-2">
+                <Flame className="w-5 h-5" />
+                HOTSPOT FEATURES ({heatmapData.hotspots.length})
+              </h4>
+              <p className="text-xs font-mono text-gray-400 mb-4">
+                These features concentrate high risk and coupling. Changes here
+                have wide blast radius.
+              </p>
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                {heatmapData.hotspots.map((h: any) => (
+                  <div
+                    key={h.featureId}
+                    className="glass-card border border-gray-800 p-4"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-sm font-semibold text-foreground">
+                        {h.featureLabel}
+                      </span>
+                      <span
+                        className={`text-[10px] font-mono px-2 py-1 rounded-full border ${
+                          h.risk === "High"
+                            ? "text-red-300 border-red-500/40 bg-red-500/10"
+                            : h.risk === "Med"
+                            ? "text-yellow-300 border-yellow-500/40 bg-yellow-500/10"
+                            : "text-green-300 border-green-500/40 bg-green-500/10"
+                        }`}
+                      >
+                        Risk: {h.risk}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {h.reasons && h.reasons.length > 0 && (
+                        <div>
+                          <p className="text-[11px] font-mono text-gray-500 mb-1">
+                            Why it's a hotspot:
+                          </p>
+                          <ul className="space-y-0.5">
+                            {h.reasons.map((reason: string, idx: number) => (
+                              <li
+                                key={idx}
+                                className="text-[11px] font-mono text-gray-300 flex gap-2"
+                              >
+                                <span className="text-red-400">•</span>
+                                <span>{reason}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {h.files && h.files.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-[10px] font-mono text-gray-500 mb-1">
+                            Key files:
+                          </p>
+                          <p className="text-[10px] font-mono text-gray-400">
+                            {h.files.slice(0, 5).join(", ")}
+                            {h.files.length > 5 && ` +${h.files.length - 5} more`}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-              {heatmapData.summary.mostDegradedNodes.length > 0 && (
-                <div className="glass-card border border-red-500/30 bg-red-500/5 p-6">
-                  <h4 className="text-lg font-mono font-bold text-red-400 mb-4 flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5" />
-                    MOST DEGRADED
-                  </h4>
-                  <ul className="space-y-2">
-                    {heatmapData.summary.mostDegradedNodes.map(
-                      (node: string, i: number) => (
-                        <li
-                          key={i}
-                          className="text-sm font-mono text-red-300 flex items-center gap-2"
+          {/* Prioritized Findings */}
+          {heatmapData.findings && heatmapData.findings.length > 0 && (
+            <div className="glass-card border border-red-500/30 p-6">
+              <h4 className="text-lg font-mono font-bold text-red-400 mb-3 flex items-center gap-2">
+                <Target className="w-5 h-5" />
+                PRIORITIZED TECHNICAL DEBT ({heatmapData.findings.length})
+              </h4>
+              <p className="text-xs font-mono text-gray-400 mb-4">
+                Actionable issues ranked by severity and effort. Focus on
+                critical/high severity items first.
+              </p>
+              <div className="space-y-4">
+                {heatmapData.findings.map((f: any) => (
+                  <div
+                    key={f.id}
+                    className="glass-card border border-gray-800 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex-1">
+                        <h5 className="font-mono text-sm font-semibold text-foreground mb-1">
+                          {f.title}
+                        </h5>
+                        <p className="text-xs font-mono text-gray-400">
+                          {f.description}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span
+                          className={`text-[10px] font-mono px-2 py-1 rounded-full border ${
+                            f.severity === "critical"
+                              ? "text-red-300 border-red-500/40 bg-red-500/10"
+                              : f.severity === "high"
+                              ? "text-orange-300 border-orange-500/40 bg-orange-500/10"
+                              : f.severity === "medium"
+                              ? "text-yellow-300 border-yellow-500/40 bg-yellow-500/10"
+                              : "text-gray-300 border-gray-500/40 bg-gray-500/10"
+                          }`}
                         >
-                          <TrendingUp className="w-4 h-4 flex-shrink-0" />
-                          {node}
-                        </li>
-                      )
+                          Severity: {f.severity.toUpperCase()}
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono px-2 py-1 rounded-full border ${
+                            f.effort === "quick-win"
+                              ? "text-green-300 border-green-500/40 bg-green-500/10"
+                              : f.effort === "moderate"
+                              ? "text-yellow-300 border-yellow-500/40 bg-yellow-500/10"
+                              : "text-orange-300 border-orange-500/40 bg-orange-500/10"
+                          }`}
+                        >
+                          Effort: {f.effort.replace("-", " ").toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {f.evidence && f.evidence.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-800">
+                        <p className="text-[10px] font-mono text-gray-500 mb-2 font-semibold">
+                          Evidence:
+                        </p>
+                        <ul className="space-y-1">
+                          {f.evidence.map((e: string, idx: number) => (
+                            <li
+                              key={idx}
+                              className="text-[11px] font-mono text-gray-300 flex gap-2"
+                            >
+                              <span className="text-cyan-400">→</span>
+                              <span>{e}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
-                  </ul>
-                </div>
-              )}
+
+                    {f.recommendedActions &&
+                      f.recommendedActions.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-800">
+                          <p className="text-[10px] font-mono text-gray-500 mb-2 font-semibold">
+                            Recommended next steps:
+                          </p>
+                          <ul className="space-y-1">
+                            {f.recommendedActions.map((a: string, idx: number) => (
+                              <li
+                                key={idx}
+                                className="text-[11px] font-mono text-gray-300 flex gap-2"
+                              >
+                                <CheckSquare className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />
+                                <span>{a}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
