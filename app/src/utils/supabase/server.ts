@@ -14,13 +14,15 @@ export const createClient = (cookieStore: ReturnType<typeof cookies>) => {
   return createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       async getAll() {
-        return (await cookieStore).getAll();
+        const resolved = await cookieStore;
+        return resolved.getAll();
       },
-      setAll(cookiesToSet) {
+      async setAll(cookiesToSet) {
         try {
-          cookiesToSet.forEach(async ({ name, value, options }) =>
-            (await cookieStore).set(name, value, options)
-          );
+          const resolved = await cookieStore;
+          cookiesToSet.forEach(({ name, value, options }) => {
+            resolved.set(name, value, options);
+          });
         } catch {
           // The `setAll` method was called from a Server Component.
           // This can be ignored if you have middleware refreshing

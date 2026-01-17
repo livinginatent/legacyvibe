@@ -44,11 +44,24 @@ export interface GitHubInstallation {
  */
 function getGitHubApp(): App {
   const appId = process.env.GITHUB_APP_ID;
-  const privateKey = process.env.GITHUB_PRIVATE_KEY;
+  let privateKey = process.env.GITHUB_PRIVATE_KEY;
 
   if (!appId || !privateKey) {
     throw new Error(
       "GitHub App credentials not configured. Set GITHUB_APP_ID and GITHUB_PRIVATE_KEY environment variables."
+    );
+  }
+
+  // Handle Vercel environment variable format (newlines as \n)
+  // Replace literal \n with actual newlines if needed
+  if (privateKey.includes("\\n") && !privateKey.includes("\n")) {
+    privateKey = privateKey.replace(/\\n/g, "\n");
+  }
+
+  // Ensure the private key has proper formatting
+  if (!privateKey.startsWith("-----BEGIN")) {
+    throw new Error(
+      "GitHub private key format is invalid. Ensure it includes the full PEM format with BEGIN/END markers."
     );
   }
 
@@ -127,11 +140,57 @@ export async function getUserRepos(): Promise<GetReposResult> {
 
   try {
     // Initialize the GitHub App
-    const app = getGitHubApp();
+    let app: App;
+    try {
+      app = getGitHubApp();
+    } catch (appError) {
+      const errorMsg =
+        appError instanceof Error ? appError.message : "Unknown error";
+      console.error("Failed to initialize GitHub App:", errorMsg);
+      
+      // Check for OpenSSL/decoder errors
+      if (
+        errorMsg.includes("DECODER") ||
+        errorMsg.includes("decoder") ||
+        errorMsg.includes("1E08010C") ||
+        errorMsg.includes("unsupported")
+      ) {
+        return {
+          error:
+            "GitHub App private key format error. Please check GITHUB_PRIVATE_KEY environment variable format in Vercel.",
+        };
+      }
+      
+      return {
+        error: "GitHub App configuration error. Please contact support.",
+      };
+    }
 
     // Get an Octokit instance authenticated for this specific installation
     // This allows us to act on behalf of the user within the scope they authorized
-    const octokit = await app.getInstallationOctokit(parseInt(installationId));
+    let octokit;
+    try {
+      octokit = await app.getInstallationOctokit(parseInt(installationId));
+    } catch (octokitError) {
+      const errorMsg =
+        octokitError instanceof Error ? octokitError.message : "Unknown error";
+      
+      // Check for OpenSSL/decoder errors in token generation
+      if (
+        errorMsg.includes("DECODER") ||
+        errorMsg.includes("decoder") ||
+        errorMsg.includes("1E08010C") ||
+        errorMsg.includes("unsupported")
+      ) {
+        console.error("OpenSSL decoder error when generating installation token:", errorMsg);
+        return {
+          error:
+            "GitHub App authentication error. Please verify GITHUB_PRIVATE_KEY format in Vercel (ensure newlines are preserved).",
+        };
+      }
+      
+      throw octokitError; // Re-throw to be handled by outer catch
+    }
 
     // Fetch repositories accessible through the GitHub App installation
     // This endpoint returns only repositories the user explicitly granted access to
@@ -152,19 +211,39 @@ export async function getUserRepos(): Promise<GetReposResult> {
     // Check if the error is a 404 (installation not found / app uninstalled)
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
+    const errorString = String(error);
+    
     const isNotFound =
       errorMessage.includes("Not Found") ||
       errorMessage.includes("404") ||
+      errorString.includes("Not Found") ||
       (error as any)?.status === 404;
+
+    // Check for OpenSSL/decoder errors
+    const isDecoderError =
+      errorMessage.includes("DECODER") ||
+      errorMessage.includes("decoder") ||
+      errorMessage.includes("1E08010C") ||
+      errorMessage.includes("unsupported") ||
+      errorString.includes("DECODER") ||
+      errorString.includes("decoder") ||
+      errorString.includes("1E08010C");
+
+    if (isDecoderError) {
+      console.error("OpenSSL decoder error:", errorMessage);
+      return {
+        error:
+          "GitHub App authentication error. The private key format may be incorrect. Please verify GITHUB_PRIVATE_KEY in Vercel environment variables (ensure the full PEM key with proper newlines is set).",
+      };
+    }
 
     if (isNotFound) {
       console.log(
-        "GitHub App installation not found - clearing stored installation_id"
+        "GitHub App installation not found - user needs to reconnect"
       );
 
-      // Clear the invalid installation_id from user metadata
-      await clearInstallationId();
-
+      // Don't clear installation_id here - it requires a Server Action
+      // The user will need to reconnect via the GitHub App flow
       return {
         error:
           "GitHub App is not connected. Please connect the GitHub App to access your repositories.",
@@ -172,7 +251,7 @@ export async function getUserRepos(): Promise<GetReposResult> {
     }
 
     // Log other errors and return generic error message
-    console.error("Failed to fetch user repos:", errorMessage);
+    console.error("Failed to fetch user repos:", errorMessage, errorString);
     return {
       error: "Failed to fetch repositories. Please try reconnecting GitHub.",
     };
