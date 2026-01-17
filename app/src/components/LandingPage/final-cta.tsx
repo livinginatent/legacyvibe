@@ -33,14 +33,14 @@ const FinalCTA = () => {
               <span className="text-primary">$14.99</span>
             </div>
             <div className="font-mono text-sm text-muted-foreground">
-              per month
+              for 5 scans
             </div>
           </div>
           
           <div className="space-y-3 mb-6">
             <div className="flex items-center justify-between font-mono text-sm">
               <span className="text-muted-foreground">Repository Scans</span>
-              <span className="text-foreground font-semibold">5 per month</span>
+              <span className="text-foreground font-semibold">5</span>
             </div>
             <div className="flex items-center justify-between font-mono text-sm">
               <span className="text-muted-foreground">Smart Reanalyze</span>

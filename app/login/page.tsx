@@ -18,6 +18,8 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/app/src/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +35,7 @@ function LoginPageContent() {
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState("");
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Check if user is already logged in
   useEffect(() => {
@@ -226,12 +229,24 @@ function LoginPageContent() {
                 <Input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   required
                   disabled={isLoading}
-                  className="pl-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="pl-10 pr-10 bg-black/40 border-primary/20 focus:border-primary/50 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
               {isSignUp && (
                 <p className="text-xs font-mono text-muted-foreground">
@@ -312,10 +327,7 @@ function LoginPageContent() {
           <div className="mt-8 pt-6 border-t border-primary/10">
             <p className="text-xs text-center font-mono text-muted-foreground">
               By continuing, you agree to our{" "}
-              <Link href="/terms" className="text-primary hover:underline">
-                Terms
-              </Link>{" "}
-              and{" "}
+              
               <Link href="/privacy" className="text-primary hover:underline">
                 Privacy Policy
               </Link>

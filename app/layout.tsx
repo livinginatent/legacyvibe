@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   creator: "Cadracode",
   publisher: "Cadracode",
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "https://cadracode.vercel.app"
+    process.env.NEXT_PUBLIC_SITE_URL || "https://cadracode.com"
   ),
   alternates: {
     canonical: "/",

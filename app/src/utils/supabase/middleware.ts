@@ -37,6 +37,7 @@ export async function updateSession(request: NextRequest) {
       path === "/" || 
       path.startsWith("/auth") || 
       path.startsWith("/login") ||
+      path.startsWith("/privacy") || // Privacy policy is public
       path.startsWith("/api"); // API routes (including webhooks) don't require auth
 
     if (!isPublicRoute) {
