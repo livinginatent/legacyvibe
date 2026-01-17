@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         payment_status: "succeeded",
         payment_date: new Date().toISOString(),
         scans_used: 0,
-        scans_limit: 10,
+        scans_limit: 5, // Blueprint scans (only limited feature)
         period_start: new Date().toISOString(),
         period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString(),
@@ -61,11 +61,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[Payment Verify] SUCCESS: Granted 5 scans to user ${user.id}`);
+    console.log(
+      `[Payment Verify] SUCCESS: Granted 5 blueprint scans to user ${user.id}. Other features are unlimited.`
+    );
 
     return NextResponse.json({
       success: true,
-      message: "Payment verified! You now have 10 blast radius scans.",
+      message:
+        "Payment verified! You now have 5 blueprint scans. Other features (blast radius, onboarding, docs) are unlimited.",
     });
   } catch (error) {
     console.error("[Payment Verify] Error:", error);

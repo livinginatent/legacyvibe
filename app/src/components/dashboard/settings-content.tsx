@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User,
   Lock,
@@ -16,13 +16,25 @@ import {
   Eye,
   EyeOff,
   UserX,
+  Zap,
+  Target,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/src/components/ui/button";
 
+interface UsageData {
+  scansUsed: number;
+  scansLimit: number;
+  scansRemaining: number;
+  daysUntilReset: number;
+  hasPaid: boolean;
+}
+
 export function SettingsContent() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"profile" | "data">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "data" | "usage">("profile");
+  const [usageData, setUsageData] = useState<UsageData | null>(null);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(true);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -47,6 +59,25 @@ export function SettingsContent() {
   const [confirmAccountDelete, setConfirmAccountDelete] = useState(false);
   const [accountDeletePassword, setAccountDeletePassword] = useState("");
   const [showAccountDeletePassword, setShowAccountDeletePassword] = useState(false);
+
+  // Fetch usage data
+  useEffect(() => {
+    const fetchUsage = async () => {
+      try {
+        const response = await fetch("/api/usage");
+        if (response.ok) {
+          const data = await response.json();
+          setUsageData(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch usage:", error);
+      } finally {
+        setIsLoadingUsage(false);
+      }
+    };
+
+    fetchUsage();
+  }, []);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,6 +233,17 @@ export function SettingsContent() {
         >
           <User className="w-4 h-4 inline mr-2" />
           Profile
+        </button>
+        <button
+          onClick={() => setActiveTab("usage")}
+          className={`px-6 py-3 font-mono text-sm font-semibold transition-all ${
+            activeTab === "usage"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Zap className="w-4 h-4 inline mr-2" />
+          Usage
         </button>
         <button
           onClick={() => setActiveTab("data")}
@@ -488,6 +530,137 @@ export function SettingsContent() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Usage Tab */}
+      {activeTab === "usage" && (
+        <div className="glass-card border border-primary/20 p-8 space-y-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Zap className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-foreground">
+                Usage & Limits
+              </h2>
+              <p className="text-sm text-muted-foreground font-mono">
+                Track your scan usage and limits
+              </p>
+            </div>
+          </div>
+
+          {isLoadingUsage ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : usageData ? (
+            <div className="space-y-6">
+              {/* Blueprint Scans */}
+              <div className="glass-card border border-primary/30 p-6 bg-primary/5">
+                <div className="flex items-center gap-3 mb-4">
+                  <Zap className="w-5 h-5 text-primary" />
+                  <h3 className="text-xl font-mono font-bold text-foreground">
+                    Blueprint Scans
+                  </h3>
+                </div>
+                <p className="text-sm font-mono text-muted-foreground mb-4">
+                  Full repository analysis scans (limit: 5 per period)
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-sm text-muted-foreground">
+                      Used
+                    </span>
+                    <span className="font-mono font-bold text-foreground">
+                      {usageData.scansUsed} / {usageData.scansLimit}
+                    </span>
+                  </div>
+                  <div className="w-full bg-black/50 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          (usageData.scansUsed / usageData.scansLimit) * 100,
+                          100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-muted-foreground">
+                      {usageData.scansRemaining} remaining
+                    </span>
+                  
+                  </div>
+                </div>
+              </div>
+
+              {/* Unlimited Features */}
+              <div className="glass-card border border-emerald-500/30 p-6 bg-emerald-500/5">
+                <div className="flex items-center gap-3 mb-4">
+                  <Target className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-xl font-mono font-bold text-foreground">
+                    Unlimited Features
+                  </h3>
+                </div>
+                <p className="text-sm font-mono text-muted-foreground mb-4">
+                  These features have no usage limits
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-mono">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span className="text-foreground">Blast Radius Analysis</span>
+                    <span className="text-emerald-400 ml-auto">Unlimited</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-mono">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span className="text-foreground">Onboarding Paths</span>
+                    <span className="text-emerald-400 ml-auto">Unlimited</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-mono">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span className="text-foreground">Documentation Generation</span>
+                    <span className="text-emerald-400 ml-auto">Unlimited</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-mono">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span className="text-foreground">Technical Debt Audit</span>
+                    <span className="text-emerald-400 ml-auto">Unlimited</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Status */}
+              {!usageData.hasPaid && (
+                <div className="glass-card border border-yellow-500/30 p-6 bg-yellow-500/5">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-mono font-semibold text-yellow-500 mb-2">
+                        Payment Required
+                      </h3>
+                      <p className="text-sm font-mono text-muted-foreground mb-4">
+                        Complete a one-time $14.99 payment to unlock scans.
+                      </p>
+                      <Button
+                        onClick={() => router.push("/dashboard")}
+                        className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-black font-semibold font-mono"
+                      >
+                        Go to Dashboard
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="glass-card border border-destructive/30 p-6 bg-destructive/5">
+              <p className="text-sm font-mono text-destructive">
+                Failed to load usage data. Please try again later.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

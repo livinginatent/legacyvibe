@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Blueprint scans (only feature with limits)
     const scansRemaining = usage.scans_limit - usage.scans_used;
     const percentageUsed = (usage.scans_used / usage.scans_limit) * 100;
     const isLimitReached = usage.scans_used >= usage.scans_limit;
@@ -55,11 +56,13 @@ export async function GET(request: NextRequest) {
     );
 
     return NextResponse.json({
+      // Blueprint scans (only limited feature)
       scansUsed: usage.scans_used,
       scansLimit: usage.scans_limit,
       scansRemaining,
       percentageUsed: Math.round(percentageUsed),
       isLimitReached,
+      // Common fields
       periodStart: usage.period_start,
       periodEnd: usage.period_end,
       daysUntilReset,

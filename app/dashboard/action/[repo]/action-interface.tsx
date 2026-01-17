@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Loader2,
   Terminal,
@@ -351,6 +351,147 @@ function VibeCardNode({ data }: { data: any }) {
   );
 }
 
+// File Tree Node Structure
+interface FileTreeNode {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  children: Map<string, FileTreeNode>;
+}
+
+// Build tree structure from flat file list
+function buildFileTree(
+  files: { path: string; type: "file" | "dir"; size?: number }[]
+): FileTreeNode {
+  const root: FileTreeNode = {
+    name: "",
+    path: "",
+    type: "dir",
+    children: new Map(),
+  };
+
+  for (const file of files) {
+    const parts = file.path.split("/").filter(Boolean);
+    let current = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+      const currentPath = parts.slice(0, i + 1).join("/");
+
+      if (!current.children.has(part)) {
+        current.children.set(part, {
+          name: part,
+          path: currentPath,
+          type: isLast ? file.type : "dir",
+          children: new Map(),
+        });
+      }
+
+      current = current.children.get(part)!;
+    }
+  }
+
+  return root;
+}
+
+// File Tree View Component
+function FileTreeView({
+  fileTree,
+  expandedDirs,
+  onToggleDir,
+  onFileClick,
+}: {
+  fileTree: { path: string; type: "file" | "dir"; size?: number }[];
+  expandedDirs: Set<string>;
+  onToggleDir: (dir: string) => void;
+  onFileClick: (path: string) => void;
+}) {
+  const tree = buildFileTree(fileTree);
+
+  const renderNode = (
+    node: FileTreeNode,
+    level: number = 0
+  ): React.ReactElement[] => {
+    const elements: React.ReactElement[] = [];
+    const isExpanded = expandedDirs.has(node.path);
+    const hasChildren = node.children.size > 0;
+    const indent = level * 16;
+
+    if (node.path) {
+      // Don't render root node
+      if (node.type === "dir") {
+        elements.push(
+          <div key={node.path} style={{ paddingLeft: `${indent}px` }}>
+            <button
+              type="button"
+              onClick={() => onToggleDir(node.path)}
+              className="w-full flex items-center gap-1.5 text-xs font-mono text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded px-1 py-0.5 transition-colors"
+            >
+              {hasChildren ? (
+                <ChevronRight
+                  className={`w-3 h-3 transition-transform ${
+                    isExpanded ? "rotate-90" : ""
+                  }`}
+                />
+              ) : (
+                <div className="w-3 h-3" />
+              )}
+              <FileCode className="w-3 h-3" />
+              <span className="truncate">{node.name}</span>
+            </button>
+          </div>
+        );
+
+        if (isExpanded && hasChildren) {
+          const sortedChildren = Array.from(node.children.values()).sort((a, b) => {
+            // Directories first, then files, both alphabetically
+            if (a.type !== b.type) {
+              return a.type === "dir" ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+          });
+
+          for (const child of sortedChildren) {
+            elements.push(...renderNode(child, level + 1));
+          }
+        }
+      } else {
+        // File node
+        elements.push(
+          <div key={node.path} style={{ paddingLeft: `${indent}px` }}>
+            <button
+              type="button"
+              onClick={() => onFileClick(node.path)}
+              className="w-full flex items-center gap-1.5 text-left text-[11px] font-mono text-gray-300 hover:text-emerald-300 hover:bg-emerald-500/10 rounded px-1 py-0.5 transition-colors"
+            >
+              <div className="w-3 h-3" />
+              <FileCode className="w-3 h-3 text-gray-500" />
+              <span className="truncate">{node.name}</span>
+            </button>
+          </div>
+        );
+      }
+    } else {
+      // Root node - render all children
+      const sortedChildren = Array.from(node.children.values()).sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type === "dir" ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+      for (const child of sortedChildren) {
+        elements.push(...renderNode(child, 0));
+      }
+    }
+
+    return elements;
+  };
+
+  return <div className="space-y-0.5">{renderNode(tree)}</div>;
+}
+
 const nodeTypes = {
   vibeCard: VibeCardNode,
 };
@@ -385,6 +526,7 @@ export function ActionInterface({
   >([]);
   const [isLoadingFileTree, setIsLoadingFileTree] = useState(false);
   const [fileTreeError, setFileTreeError] = useState<string | null>(null);
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
 
   // Onboarding state
   const [onboardingMode, setOnboardingMode] = useState(false);
@@ -1383,8 +1525,8 @@ export function ActionInterface({
                   </div>
 
                   {/* GitHub-like file tree */}
-                  <div className="w-full lg:w-80 max-h-72 overflow-auto rounded-lg border border-emerald-500/20 bg-black/40 p-3">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="w-full lg:w-80 max-h-[600px] overflow-auto rounded-lg border border-emerald-500/20 bg-black/40 p-3">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <FileCode className="w-4 h-4 text-emerald-400" />
                         <span className="text-xs font-mono text-gray-300">
@@ -1409,53 +1551,25 @@ export function ActionInterface({
                     )}
 
                     {!fileTreeError && fileTree.length > 0 && (
-                      <div className="space-y-2">
-                        {Object.entries(
-                          fileTree
-                            .filter((node) => node.type === "file")
-                            .reduce<Record<string, string[]>>((acc, node) => {
-                              const segments = node.path.split("/");
-                              const top =
-                                segments.length > 1 ? segments[0] : "(root)";
-                              if (!acc[top]) acc[top] = [];
-                              acc[top].push(node.path);
-                              return acc;
-                            }, {})
-                        )
-                          .sort(([a], [b]) => a.localeCompare(b))
-                          .map(([topDir, paths]) => (
-                            <div key={topDir}>
-                              <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 mb-1">
-                                <ChevronRight className="w-3 h-3" />
-                                <span>{topDir}</span>
-                              </div>
-                              <ul className="space-y-0.5 ml-5">
-                                {paths
-                                  .sort((a, b) => a.localeCompare(b))
-                                  .slice(0, 20)
-                                  .map((path) => (
-                                    <li key={path}>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setImpactSearchQuery(path);
-                                          handleImpactAnalysis(path);
-                                        }}
-                                        className="w-full text-left text-[11px] font-mono text-gray-300 hover:text-emerald-300 hover:bg-emerald-500/10 rounded px-1 py-0.5"
-                                      >
-                                        {path.replace(`${topDir}/`, "")}
-                                      </button>
-                                    </li>
-                                  ))}
-                                {paths.length > 20 && (
-                                  <li className="text-[11px] font-mono text-gray-500">
-                                    + {paths.length - 20} more…
-                                  </li>
-                                )}
-                              </ul>
-                            </div>
-                          ))}
-                      </div>
+                      <FileTreeView
+                        fileTree={fileTree}
+                        expandedDirs={expandedDirs}
+                        onToggleDir={(dir: string) => {
+                          setExpandedDirs((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(dir)) {
+                              next.delete(dir);
+                            } else {
+                              next.add(dir);
+                            }
+                            return next;
+                          });
+                        }}
+                        onFileClick={(path: string) => {
+                          setImpactSearchQuery(path);
+                          handleImpactAnalysis(path);
+                        }}
+                      />
                     )}
                   </div>
                 </div>
@@ -1536,7 +1650,7 @@ export function ActionInterface({
               </h2>
               <p className="text-sm text-muted-foreground font-mono mb-4">
                 {error ||
-                  "Complete a one-time payment to unlock 5 repository scans."}
+                  "Complete a one-time payment to unlock 5 blueprint scans. Other features are unlimited."}
               </p>
             </div>
 
@@ -1552,7 +1666,7 @@ export function ActionInterface({
               <div className="border-t border-primary/10 pt-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm font-mono text-muted-foreground">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  <span>5 repository scans included</span>
+                  <span>5 blueprint scans included • Other features unlimited</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm font-mono text-muted-foreground">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />

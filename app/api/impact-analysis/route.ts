@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/app/src/utils/supabase/server";
+import Anthropic from "@anthropic-ai/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     const [owner, repo] = repoFullName.split("/");
 
-    // Check for cached impact analysis
+    // Check for cached impact analysis (cached results don't count against limit) (cached results don't count against limit)
     const { data: cachedImpact } = await supabase
       .from("impact_analyses")
       .select("*")
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Blast radius scans are unlimited - no usage checks needed
     // Get the cached blueprint for this repo
     const { data: analysis, error: dbError } = await supabase
       .from("analyses")
@@ -115,9 +117,31 @@ export async function POST(request: NextRequest) {
 
     const blueprint = analysis.analysis;
 
-    // Perform impact analysis
+    // Perform impact analysis (algorithmic)
     const result = analyzeImpact(filePath, blueprint);
 
+    // Enhance with Claude AI for technical details (only if there are affected nodes)
+    if (
+      result.directlyAffectedNodes.length > 0 ||
+      result.indirectlyAffectedNodes.length > 0
+    ) {
+      try {
+        const enhancedResult = await enhanceWithClaude(
+          filePath,
+          result,
+          blueprint
+        );
+        // Merge enhanced details back into result
+        result.directlyAffectedNodes = enhancedResult.directlyAffectedNodes;
+        result.indirectlyAffectedNodes = enhancedResult.indirectlyAffectedNodes;
+        result.recommendations = enhancedResult.recommendations;
+      } catch (error) {
+        console.error("Failed to enhance with Claude, using basic analysis:", error);
+        // Continue with basic analysis if Claude fails
+      }
+    }
+
+    // Blast radius scans are unlimited - no usage tracking needed
     // Cache the result
     const now = new Date().toISOString();
     const { error: cacheError } = await supabase.from("impact_analyses").upsert(
@@ -421,6 +445,149 @@ function generateRecommendations(
   );
 
   return recommendations;
+}
+
+/**
+ * Enhances impact analysis with Claude AI for technical details
+ * Cost-optimized: Small prompt, focused on key affected nodes only
+ */
+async function enhanceWithClaude(
+  filePath: string,
+  result: ImpactAnalysisResult,
+  blueprint: any
+): Promise<{
+  directlyAffectedNodes: AffectedNode[];
+  indirectlyAffectedNodes: AffectedNode[];
+  recommendations: string[];
+}> {
+  const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  });
+
+  // Focus on top 5 most critical affected nodes to keep prompt small
+  const topDirect = result.directlyAffectedNodes
+    .slice(0, 5)
+    .map((n) => ({
+      id: n.id,
+      label: n.label,
+      description: n.description,
+      risk: n.risk,
+      files: blueprint.nodes.find((node: any) => node.id === n.id)?.files || [],
+    }));
+
+  const topIndirect = result.indirectlyAffectedNodes
+    .slice(0, 5)
+    .map((n) => ({
+      id: n.id,
+      label: n.label,
+      description: n.description,
+      risk: n.risk,
+      files: blueprint.nodes.find((node: any) => node.id === n.id)?.files || [],
+    }));
+
+  const systemPrompt = `You are a senior software engineer analyzing code change impact. Provide specific, technical insights about how changing a file affects other features.
+
+Be concise, technical, and actionable. Focus on:
+- Specific technical dependencies (APIs, data structures, interfaces)
+- Actual code-level concerns (breaking changes, type mismatches, side effects)
+- Real testing requirements (what specific tests need updating)
+- Concrete risks (not generic warnings)
+
+Keep responses brief - 1-2 sentences per insight.`;
+
+  const userPrompt = `Analyze the impact of changing file: ${filePath}
+
+DIRECTLY AFFECTED FEATURES (${topDirect.length}):
+${topDirect
+  .map(
+    (n) => `- ${n.label} (${n.risk} risk): ${n.description}
+  Files: ${n.files.slice(0, 3).join(", ")}`
+  )
+  .join("\n")}
+
+INDIRECTLY AFFECTED FEATURES (${topIndirect.length}):
+${topIndirect
+  .map(
+    (n) => `- ${n.label} (${n.risk} risk): ${n.description}
+  Files: ${n.files.slice(0, 3).join(", ")}`
+  )
+  .join("\n")}
+
+RISK SCORE: ${result.riskScore}/100 (${result.riskLevel})
+
+Provide:
+1. Enhanced "reason" for each directly affected feature (1 sentence, technical)
+2. Enhanced "reason" for each indirectly affected feature (1 sentence, technical)
+3. 3-5 specific, actionable recommendations (not generic)
+
+Return JSON only:
+{
+  "directReasons": { "nodeId": "technical reason string" },
+  "indirectReasons": { "nodeId": "technical reason string" },
+  "recommendations": ["specific recommendation 1", "specific recommendation 2", ...]
+}`;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 800, // Keep small to reduce cost
+      system: systemPrompt,
+      messages: [
+        {
+          role: "user",
+          content: userPrompt,
+        },
+      ],
+    });
+
+    // Extract text from response
+    let responseText = "";
+    if (response.content[0].type === "text") {
+      responseText = response.content[0].text;
+    }
+
+    // Parse JSON from response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON found in Claude response");
+    }
+
+    const enhanced = JSON.parse(jsonMatch[0]);
+
+    // Apply enhanced reasons to nodes
+    const enhancedDirect = result.directlyAffectedNodes.map((node) => ({
+      ...node,
+      reason:
+        enhanced.directReasons?.[node.id] ||
+        node.reason ||
+        `Contains the file: ${filePath}`,
+    }));
+
+    const enhancedIndirect = result.indirectlyAffectedNodes.map((node) => ({
+      ...node,
+      reason:
+        enhanced.indirectReasons?.[node.id] ||
+        node.reason ||
+        "Connected via dependency",
+    }));
+
+    return {
+      directlyAffectedNodes: enhancedDirect,
+      indirectlyAffectedNodes: enhancedIndirect,
+      recommendations:
+        enhanced.recommendations && Array.isArray(enhanced.recommendations)
+          ? enhanced.recommendations
+          : result.recommendations,
+    };
+  } catch (error) {
+    console.error("Claude enhancement error:", error);
+    // Return original if enhancement fails
+    return {
+      directlyAffectedNodes: result.directlyAffectedNodes,
+      indirectlyAffectedNodes: result.indirectlyAffectedNodes,
+      recommendations: result.recommendations,
+    };
+  }
 }
 
 /**

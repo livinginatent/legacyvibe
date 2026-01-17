@@ -177,22 +177,23 @@ export async function POST(request: NextRequest) {
           {
             error: "PAYMENT_REQUIRED",
             message:
-              "Please complete the one-time $14.99 payment to unlock 10 blast radius scans.",
+              "Please complete the one-time $14.99 payment to unlock 5 blueprint scans. Other features (blast radius, onboarding, docs) are unlimited.",
             requiresPayment: true,
           },
           { status: 402 } // 402 Payment Required
         );
       }
 
-      // Check if limit exceeded
-      if (usage && usage.scans_used >= usage.scans_limit) {
+      // Check if blueprint scan limit exceeded (5 scans)
+      const blueprintScansLimit = usage?.scans_limit || 5;
+      if (usage && usage.scans_used >= blueprintScansLimit) {
         return NextResponse.json(
           {
             error: "USAGE_LIMIT_REACHED",
-            message: `You've used all ${usage.scans_limit} blast radius scans. Pay $14.99 to unlock 10 more scans.`,
+            message: `You've used all ${blueprintScansLimit} blueprint scans. Pay $14.99 to unlock 5 more blueprint scans. Other features (blast radius, onboarding, docs) are unlimited.`,
             usage: {
               used: usage.scans_used,
-              limit: usage.scans_limit,
+              limit: blueprintScansLimit,
               resetDate: usage.period_end,
             },
             requiresPayment: true,
@@ -201,13 +202,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Increment usage counter
+      // Increment blueprint scan usage counter
       const newScansUsed = (usage?.scans_used || 0) + 1;
       const { error: upsertError } = await supabase.from("user_usage").upsert(
         {
           user_id: user.id,
           scans_used: newScansUsed,
-          scans_limit: 10,
+          scans_limit: 5, // Blueprint scans limit
           updated_at: new Date().toISOString(),
         },
         {
@@ -219,7 +220,7 @@ export async function POST(request: NextRequest) {
         console.error("Failed to update usage:", upsertError);
         // Don't fail the request, just log the error
       } else {
-        console.log(`[Usage] Scan ${newScansUsed}/5 for user ${user.id}`);
+        console.log(`[Usage] Blueprint scan ${newScansUsed}/5 for user ${user.id}`);
       }
     }
 
